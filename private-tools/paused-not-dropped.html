@@ -204,6 +204,35 @@ h2 {
   margin-bottom: 14px;
 }
 
+.panel.collapsible > .panel-heading {
+  cursor: pointer;
+}
+
+.panel.collapsed > .collapsible-body {
+  display: none;
+}
+
+.panel.collapsed > .panel-heading {
+  margin-bottom: 0;
+}
+
+.collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--green);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.panel.collapsed .collapse-toggle {
+  transform: rotate(-90deg);
+}
+
 .button-row {
   display: flex;
   flex-wrap: wrap;
@@ -1312,6 +1341,48 @@ function resetTaskGoalChoices() {
   });
 }
 
+function setupCollapsibleSections() {
+  document.querySelectorAll(".panel").forEach((panel, index) => {
+    const heading = panel.querySelector(":scope > .panel-heading");
+    if (!heading || panel.querySelector(":scope > .collapsible-body")) return;
+
+    const title = heading.querySelector("h2")?.textContent?.trim() || `Section ${index + 1}`;
+    const body = document.createElement("div");
+    body.className = "collapsible-body";
+    while (heading.nextSibling) body.appendChild(heading.nextSibling);
+    panel.appendChild(body);
+    panel.classList.add("collapsible");
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "collapse-toggle";
+    button.setAttribute("aria-label", `Collapse ${title}`);
+    button.textContent = "⌄";
+    heading.appendChild(button);
+
+    const key = `paused-section-collapsed-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+    if (localStorage.getItem(key) === "true") {
+      panel.classList.add("collapsed");
+      button.setAttribute("aria-label", `Expand ${title}`);
+    }
+
+    const toggle = () => {
+      const collapsed = panel.classList.toggle("collapsed");
+      localStorage.setItem(key, String(collapsed));
+      button.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} ${title}`);
+    };
+
+    heading.addEventListener("click", (event) => {
+      if (event.target.closest("button, a, input, select, textarea")) return;
+      toggle();
+    });
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggle();
+    });
+  });
+}
+
 function bindEvents() {
   ["#energyFilter", "#timeFilter", "#modeFilter", "#goalFilter"].forEach((selector) => {
     document.querySelector(selector).addEventListener("change", renderAll);
@@ -1427,6 +1498,7 @@ function bindEvents() {
 model = normalizeModel(model);
 saveModel();
 populateSelects();
+setupCollapsibleSections();
 bindEvents();
 renderAll();
 
