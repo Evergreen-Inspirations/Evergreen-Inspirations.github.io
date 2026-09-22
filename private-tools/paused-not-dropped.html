@@ -871,6 +871,7 @@ button {
             <form id="winForm" class="win-form">
               <input id="winText" type="text" placeholder="Log a win, thought, or start" required />
               <select id="winGoal"></select>
+              <select id="winStatus"></select>
               <button class="secondary-button" type="submit">Log</button>
             </form>
             <div id="todayLog" class="today-log"></div>
@@ -1080,6 +1081,7 @@ function matchingTasks() {
 function populateSelects() {
   const goalFilter = document.querySelector("#goalFilter");
   const winGoal = document.querySelector("#winGoal");
+  const winStatus = document.querySelector("#winStatus");
   const goalChoices = document.querySelector("#taskGoalChoices");
 
   for (const goal of goals) {
@@ -1090,6 +1092,11 @@ function populateSelects() {
       `<label><input type="checkbox" name="taskGoals" value="${goal.id}" />${goal.name}</label>`,
     );
   }
+
+  for (const state of states) {
+    winStatus.add(new Option(state, state));
+  }
+  winStatus.value = "Made Progress";
 
   goalChoices.querySelector('input[value="career"]').checked = true;
 }
@@ -1280,7 +1287,7 @@ function renderToday() {
           (item) => `
           <div class="log-item">
             <strong>${escapeHtml(item.text)}</strong>
-            <small>${goalName(item.goal)}</small>
+            <small>${goalName(item.goal)}${item.state ? ` · ${item.state}` : ""}</small>
           </div>
         `,
         )
@@ -1299,14 +1306,30 @@ function recordActivity(title, state, goalIds) {
   model.activity = model.activity.slice(-80);
 }
 
-function logWin(text, goal) {
+function logWin(text, goal, state = "Made Progress") {
+  const now = new Date().toISOString();
+  const goalIds = [goal];
+  const task = {
+    id: makeId("task"),
+    title: text,
+    goalIds,
+    energy: "low",
+    time: "5",
+    mode: "planning",
+    state,
+    updatedAt: now,
+  };
+
+  model.tasks.unshift(task);
   model.today.push({
     id: makeId("win"),
     text,
     goal,
-    at: new Date().toISOString(),
+    state,
+    at: now,
+    taskId: task.id,
   });
-  recordActivity(text, "Today Counts", [goal]);
+  recordActivity(text, state, goalIds);
   saveModel();
   renderAll();
 }
@@ -1469,8 +1492,13 @@ function bindEvents() {
   document.querySelector("#winForm").addEventListener("submit", (event) => {
     event.preventDefault();
     const input = document.querySelector("#winText");
-    logWin(input.value.trim(), document.querySelector("#winGoal").value);
+    logWin(
+      input.value.trim(),
+      document.querySelector("#winGoal").value,
+      document.querySelector("#winStatus").value,
+    );
     input.value = "";
+    document.querySelector("#winStatus").value = "Made Progress";
   });
 
   document.querySelector("#clearToday").addEventListener("click", () => {
