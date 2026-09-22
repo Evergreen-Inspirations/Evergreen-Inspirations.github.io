@@ -351,6 +351,11 @@ button {
   align-items: end;
 }
 
+.win-form {
+  grid-template-columns: minmax(180px, 1.2fr) repeat(5, minmax(96px, 0.65fr)) auto;
+  align-items: end;
+}
+
 .goal-picker {
   min-width: 0;
   margin: 0;
@@ -468,9 +473,24 @@ button {
   color: #fff;
 }
 
+.card-actions {
+  display: flex;
+  align-items: start;
+  gap: 6px;
+}
+
+.edit-button,
 .delete-button {
   min-width: 36px;
   min-height: 36px;
+}
+
+.edit-button {
+  background: #e4eef8;
+  color: var(--blue);
+}
+
+.delete-button {
   background: #fff0eb;
   color: var(--rust);
 }
@@ -538,10 +558,15 @@ button {
   font-weight: 850;
 }
 
+.change-state.urgent-need-to-do {
+  background: #ffe1da;
+  color: #a6361d;
+}
+
 .change-state.started,
 .change-state.made-progress,
-.change-state.done,
 .change-state.added,
+.change-state.edited,
 .change-state.restored,
 .change-state.spun,
 .change-state.today-counts {
@@ -550,17 +575,18 @@ button {
 }
 
 .change-state.paused,
+.change-state.waiting,
 .change-state.thinking-about {
   background: #fff3cc;
   color: #7a5a00;
 }
 
-.change-state.waiting {
+.change-state.completed,
+.change-state.dropped-on-purpose {
   background: #e4eef8;
   color: var(--blue);
 }
 
-.change-state.dropped-on-purpose,
 .change-state.deleted {
   background: #fff0eb;
   color: var(--rust);
@@ -747,8 +773,10 @@ button {
             <div id="completedSnapshot" class="snapshot-list"></div>
           </div>
           <div>
-            <h3 class="subhead">Goal Mix Across Tasks</h3>
-            <p class="microcopy">Percentages are based on all open and completed tasks. A multi-goal task counts once for each goal it supports.</p>
+            <h3 class="subhead">Recently Changed</h3>
+            <div id="recentChanges" class="snapshot-list"></div>
+            <h3 class="subhead spaced">Goal Mix Across Tasks</h3>
+            <p class="microcopy">Green = started/made progress. Yellow = paused/waiting/thinking. Red = urgent. Navy = completed/released.</p>
             <div id="goalMix" class="goal-mix"></div>
           </div>
         </div>
@@ -851,6 +879,9 @@ button {
             </select>
             <button class="primary-button" type="submit">Save</button>
           </form>
+          <h3 class="subhead">What’s Next?</h3>
+          <div id="nextShortlist" class="snapshot-list"></div>
+          <h3 class="subhead spaced">All Options</h3>
           <div id="taskList" class="task-list"></div>
         </div>
 
@@ -872,6 +903,9 @@ button {
               <input id="winText" type="text" placeholder="Log a win, thought, or start" required />
               <select id="winGoal"></select>
               <select id="winStatus"></select>
+              <select id="winEnergy"><option value="low">Low energy</option><option value="medium">Medium</option><option value="high">Focused</option></select>
+              <select id="winTime"><option value="5">5 min</option><option value="15">15 min</option><option value="30">30 min</option><option value="60">1 hour</option></select>
+              <select id="winMode"><option value="planning">Planning</option><option value="recovery">Recovery</option><option value="out">Out</option><option value="computer">Computer</option><option value="body">Body</option><option value="social">Social/admin</option></select>
               <button class="secondary-button" type="submit">Log</button>
             </form>
             <div id="todayLog" class="today-log"></div>
@@ -943,13 +977,13 @@ const goals = [
   },
 ];
 
-const states = ["Idea", "Thinking About", "Started", "Made Progress", "Paused", "Waiting", "Done", "Dropped On Purpose"];
-const closedStates = new Set(["Done", "Dropped On Purpose"]);
+const states = ["URGENT / Need to do", "Idea", "Thinking About", "Started", "Made Progress", "Paused", "Waiting", "Completed", "Dropped On Purpose"];
+const closedStates = new Set(["Completed", "Dropped On Purpose"]);
 const storeKey = "paused-not-dropped-v1";
 
 const starterTasks = [
   ["Rest and hydrate after vaccines", ["body"], "low", "15", "recovery", "Paused"],
-  ["Log today’s vaccine details", ["body", "meds"], "low", "5", "computer", "Done"],
+  ["Log today’s vaccine details", ["body", "meds"], "low", "5", "computer", "Completed"],
   ["Pick one tiny internship task", ["career", "school"], "medium", "15", "computer", "Idea"],
   ["Mountaineers mechanical spreadsheet", ["school", "career"], "high", "60", "computer", "Started"],
   ["Update internship hours tracker", ["career", "routines"], "medium", "15", "computer", "Started"],
@@ -1003,6 +1037,7 @@ function normalizeModel(raw) {
   return {
     tasks: tasks.map((task) => ({
       ...task,
+      state: task.state === "Done" ? "Completed" : task.state,
       goalIds: normalizeGoals(task.goalIds || task.goals || task.goal),
       updatedAt: task.updatedAt || new Date().toISOString(),
     })),
@@ -1107,6 +1142,7 @@ function renderDashboard() {
   document.querySelector("#taskCounts").textContent = `${open.length} open · ${complete.length} complete`;
   renderOpenSnapshot(open);
   renderCompletedSnapshot(complete);
+  renderRecentChanges();
   renderGoalMix(open, complete);
 }
 
@@ -1128,6 +1164,20 @@ function renderCompletedSnapshot(complete) {
     : `<div class="empty">Recently completed tasks will land here.</div>`;
 }
 
+function renderRecentChanges() {
+  const recent = [...model.activity].slice().reverse().slice(0, 8);
+  document.querySelector("#recentChanges").innerHTML = recent.length
+    ? recent.map((item) => `
+      <div class="snapshot-row">
+        <span>
+          <strong>${escapeHtml(item.title)}</strong>
+          <small>${(item.goalIds || []).map(goalName).join(" / ")} · ${formatTime(item.at)}</small>
+        </span>
+        <span class="change-state ${stateClass(item.state)}">${escapeHtml(item.state)}</span>
+      </div>
+    `).join("")
+    : `<div class="empty">Changes you make will show here newest first.</div>`;
+}
 function snapshotRow(task) {
   return `
     <div class="snapshot-row">
@@ -1198,6 +1248,7 @@ function renderGoals() {
 function renderTasks() {
   const list = document.querySelector("#taskList");
   const matches = matchingTasks();
+  renderNextShortlist(matches);
   const matchIds = new Set(matches.map((task) => task.id));
   const openSorted = openTasks().sort((a, b) => {
     const matchDelta = Number(matchIds.has(b.id)) - Number(matchIds.has(a.id));
@@ -1227,6 +1278,19 @@ function renderTasks() {
   renderWheel(matches);
 }
 
+function renderNextShortlist(matches) {
+  const stateScore = { "URGENT / Need to do": 0, Started: 1, "Made Progress": 2, "Thinking About": 3, Idea: 4, Paused: 5, Waiting: 6 };
+  const shortlist = [...matches].sort((a, b) => {
+    const stateDelta = (stateScore[a.state] ?? 9) - (stateScore[b.state] ?? 9);
+    if (stateDelta) return stateDelta;
+    const timeDelta = Number(a.time) - Number(b.time);
+    if (timeDelta) return timeDelta;
+    return new Date(b.updatedAt) - new Date(a.updatedAt);
+  }).slice(0, 5);
+  document.querySelector("#nextShortlist").innerHTML = shortlist.length
+    ? shortlist.map((task) => snapshotRow(task)).join("")
+    : `<div class="empty">No matching open tasks yet. Adjust filters or add a quick capture below.</div>`;
+}
 function taskCard(task, isMatch, isCompleted = false) {
   return `
     <article class="task-card ${isCompleted ? "completed" : ""}" data-task-id="${task.id}">
@@ -1247,7 +1311,10 @@ function taskCard(task, isMatch, isCompleted = false) {
             .join("")}
         </div>
       </div>
-      <button class="delete-button" title="Delete option" data-delete="${task.id}">×</button>
+      <div class="card-actions">
+        <button class="edit-button" title="Edit option" data-edit="${task.id}">Edit</button>
+        <button class="delete-button" title="Delete option" data-delete="${task.id}">×</button>
+      </div>
     </article>
   `;
 }
@@ -1306,16 +1373,16 @@ function recordActivity(title, state, goalIds) {
   model.activity = model.activity.slice(-80);
 }
 
-function logWin(text, goal, state = "Made Progress") {
+function logWin(text, goal, state = "Made Progress", energy = "low", time = "5", mode = "planning") {
   const now = new Date().toISOString();
   const goalIds = [goal];
   const task = {
     id: makeId("task"),
     title: text,
     goalIds,
-    energy: "low",
-    time: "5",
-    mode: "planning",
+    energy,
+    time,
+    mode,
     state,
     updatedAt: now,
   };
@@ -1459,8 +1526,30 @@ function bindEvents() {
 
   document.querySelector("#taskList").addEventListener("click", (event) => {
     const state = event.target.dataset.state;
+    const editId = event.target.dataset.edit;
     const deleteId = event.target.dataset.delete;
     const card = event.target.closest("[data-task-id]");
+    if (editId) {
+      const task = model.tasks.find((item) => item.id === editId);
+      if (!task) return;
+      const title = prompt("Task title", task.title);
+      if (title === null) return;
+      const energy = prompt("Energy: low, medium, or high", task.energy);
+      if (energy === null) return;
+      const time = prompt("Minutes: 5, 15, 30, or 60", task.time);
+      if (time === null) return;
+      const mode = prompt("Mode: recovery, out, computer, body, planning, or social", task.mode);
+      if (mode === null) return;
+      task.title = title.trim() || task.title;
+      task.energy = ["low", "medium", "high"].includes(energy) ? energy : task.energy;
+      task.time = ["5", "15", "30", "60"].includes(time) ? time : task.time;
+      task.mode = ["recovery", "out", "computer", "body", "planning", "social"].includes(mode) ? mode : task.mode;
+      task.updatedAt = new Date().toISOString();
+      recordActivity(task.title, "Edited", taskGoalIds(task));
+      saveModel();
+      renderAll();
+      return;
+    }
     if (deleteId) {
       const task = model.tasks.find((item) => item.id === deleteId);
       model.tasks = model.tasks.filter((item) => item.id !== deleteId);
@@ -1477,7 +1566,7 @@ function bindEvents() {
     task.state = state;
     task.updatedAt = new Date().toISOString();
     recordActivity(task.title, state, task.goalIds);
-    if (["Started", "Made Progress", "Done", "Paused"].includes(state)) {
+    if (["Started", "Made Progress", "Completed", "Paused"].includes(state)) {
       model.today.push({
         id: makeId("win"),
         text: `${state}: ${task.title}`,
@@ -1496,9 +1585,15 @@ function bindEvents() {
       input.value.trim(),
       document.querySelector("#winGoal").value,
       document.querySelector("#winStatus").value,
+      document.querySelector("#winEnergy").value,
+      document.querySelector("#winTime").value,
+      document.querySelector("#winMode").value,
     );
     input.value = "";
     document.querySelector("#winStatus").value = "Made Progress";
+    document.querySelector("#winEnergy").value = "low";
+    document.querySelector("#winTime").value = "5";
+    document.querySelector("#winMode").value = "planning";
   });
 
   document.querySelector("#clearToday").addEventListener("click", () => {
