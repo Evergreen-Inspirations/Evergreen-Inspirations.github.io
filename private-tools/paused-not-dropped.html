@@ -1,0 +1,1387 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Paused Not Dropped</title>
+    <meta
+      name="description"
+      content="A personal next-action dashboard for tracking options, energy, and progress across life goals."
+    />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2310262b'/%3E%3Cpath d='M18 34c0-9 6-16 15-16 7 0 13 4 15 11h-8c-1-3-4-5-8-5-5 0-8 4-8 10s3 10 8 10c4 0 7-2 8-5h8c-2 7-8 11-15 11-9 0-15-7-15-16z' fill='%23f4d06f'/%3E%3Cpath d='M17 17h30v7H17z' fill='%234fb286' opacity='.9'/%3E%3C/svg%3E" />
+    <style>
+:root {
+  color-scheme: light;
+  --ink: #10262b;
+  --muted: #5f6f74;
+  --bg: #edf4f2;
+  --panel: #ffffff;
+  --line: #d8e3df;
+  --green: #2f7d68;
+  --green-2: #4fb286;
+  --gold: #f4d06f;
+  --blue: #264d73;
+  --rust: #b86443;
+  --shadow: 0 18px 40px rgba(16, 38, 43, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(244, 208, 111, 0.22), transparent 34rem),
+    linear-gradient(135deg, #edf4f2 0%, #f8faf8 100%);
+  color: var(--ink);
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.app-shell {
+  width: min(1180px, calc(100% - 28px));
+  margin: 0 auto;
+  padding: 28px 0 40px;
+}
+
+.hero-panel,
+.panel {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.hero-panel {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px;
+  margin-bottom: 18px;
+  background:
+    linear-gradient(135deg, rgba(16, 38, 43, 0.96), rgba(31, 78, 82, 0.92)),
+    var(--ink);
+  color: #f8fbfa;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--gold);
+  font-size: 0.88rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 8px;
+  font-size: clamp(2rem, 4vw, 4rem);
+  line-height: 1;
+}
+
+h2 {
+  margin-bottom: 0;
+  font-size: 1rem;
+}
+
+.lede {
+  max-width: 660px;
+  margin-bottom: 0;
+  color: #dbe9e5;
+  font-size: 1.05rem;
+}
+
+.today-card {
+  display: grid;
+  align-content: center;
+  min-width: 220px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.today-card span,
+.today-card small {
+  color: #cfe0dc;
+}
+
+.today-card strong {
+  margin: 4px 0 8px;
+  color: var(--gold);
+  font-size: 1.8rem;
+}
+
+.control-grid,
+.workspace-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.dashboard-panel {
+  margin-bottom: 18px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.75fr);
+  gap: 18px;
+}
+
+.subhead {
+  margin: 0 0 10px;
+  font-size: 0.92rem;
+}
+
+.subhead.spaced {
+  margin-top: 18px;
+}
+
+.microcopy {
+  margin: -4px 0 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.control-grid {
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.55fr);
+  margin-bottom: 18px;
+}
+
+.workspace-grid {
+  grid-template-columns: minmax(0, 1fr) 360px;
+  align-items: start;
+}
+
+.panel {
+  padding: 18px;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  padding: 0 12px;
+}
+
+button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.primary-button {
+  background: var(--ink);
+  color: #fff;
+}
+
+.secondary-button {
+  background: #dff0ea;
+  color: var(--green);
+}
+
+.ghost-button {
+  background: transparent;
+  color: var(--muted);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #eff5f3;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.wheel-wrap {
+  position: relative;
+  width: min(210px, 70vw);
+  margin: 6px auto 14px;
+  aspect-ratio: 1;
+}
+
+.wheel {
+  width: 100%;
+  height: 100%;
+  border: 10px solid #fff;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(16, 38, 43, 0.12), 0 10px 24px rgba(16, 38, 43, 0.16);
+  transition: transform 1.4s cubic-bezier(0.2, 0.72, 0.1, 1);
+}
+
+.pointer {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 22px solid var(--rust);
+}
+
+.spin-panel {
+  text-align: center;
+}
+
+.spin-result {
+  min-height: 40px;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.task-form,
+.win-form {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.task-form {
+  grid-template-columns: minmax(200px, 1.2fr) minmax(220px, 1.4fr) repeat(3, minmax(110px, 0.7fr)) auto;
+  align-items: end;
+}
+
+.goal-picker {
+  min-width: 0;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.goal-picker legend {
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.goal-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  max-height: 138px;
+  overflow: auto;
+}
+
+.goal-choice-grid label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: #f4f8f6;
+  color: var(--ink);
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.goal-choice-grid input {
+  width: auto;
+  min-height: 0;
+}
+
+.hidden {
+  display: none;
+}
+
+.task-list,
+.goal-list,
+.today-log {
+  display: grid;
+  gap: 10px;
+}
+
+.task-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 0 2px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.task-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.task-card.completed {
+  background: #f7faf9;
+  opacity: 0.82;
+}
+
+.task-card h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.meta-row,
+.state-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef5f2;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.state-button {
+  min-height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.state-button.active {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+}
+
+.delete-button {
+  min-width: 36px;
+  min-height: 36px;
+  background: #fff0eb;
+  color: var(--rust);
+}
+
+.goal-item,
+.log-item {
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.change-table,
+.snapshot-list {
+  display: grid;
+  gap: 8px;
+}
+
+.snapshot-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.snapshot-row strong {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 0.88rem;
+}
+
+.snapshot-row small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.change-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) minmax(110px, 0.55fr);
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.change-row strong {
+  font-size: 0.86rem;
+}
+
+.change-row small {
+  color: var(--muted);
+}
+
+.change-state {
+  justify-self: start;
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.change-state.started,
+.change-state.done,
+.change-state.added,
+.change-state.restored,
+.change-state.spun,
+.change-state.today-counts {
+  background: #dff0ea;
+  color: var(--green);
+}
+
+.change-state.paused,
+.change-state.thinking-about {
+  background: #fff3cc;
+  color: #7a5a00;
+}
+
+.change-state.waiting {
+  background: #e4eef8;
+  color: var(--blue);
+}
+
+.change-state.dropped-on-purpose,
+.change-state.deleted {
+  background: #fff0eb;
+  color: var(--rust);
+}
+
+.goal-mix {
+  display: grid;
+  gap: 9px;
+}
+
+.mix-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, 1.1fr) 78px;
+  align-items: center;
+  gap: 8px;
+}
+
+.mix-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.mix-bar {
+  display: flex;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8efec;
+}
+
+.mix-fill {
+  height: 100%;
+}
+
+.mix-fill.open {
+  background: var(--green);
+}
+
+.mix-fill.complete {
+  background: var(--gold);
+}
+
+.mix-value {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-align: right;
+}
+
+.goal-item strong,
+.log-item strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.92rem;
+}
+
+.goal-item small,
+.log-item small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.side-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.empty {
+  padding: 18px;
+  border: 1px dashed #bfd0cb;
+  border-radius: 8px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.empty strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ink);
+}
+
+@media (max-width: 900px) {
+  .hero-panel,
+  .control-grid,
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-panel {
+    display: grid;
+  }
+
+  .field-grid,
+  .task-form {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .change-row {
+    grid-template-columns: 1fr;
+  }
+
+  .goal-choice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .today-card {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .app-shell {
+    width: min(100% - 18px, 1180px);
+    padding-top: 12px;
+  }
+
+  .hero-panel,
+  .panel {
+    padding: 14px;
+  }
+
+  .task-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+    </style>
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hero-panel">
+        <div>
+          <p class="eyebrow">Paused Not Dropped</p>
+          <h1>What can I do next?</h1>
+          <p class="lede">
+            Pick by energy, state, goal, or let the wheel break the decision freeze.
+          </p>
+        </div>
+        <div class="today-card">
+          <span>Today touched</span>
+          <strong id="todayCount">0 goals</strong>
+          <small id="todayNote">Log a win or mark a task to start the receipt trail.</small>
+        </div>
+      </section>
+
+      <section class="panel dashboard-panel">
+        <div class="panel-heading">
+          <h2>Dashboard</h2>
+          <span id="taskCounts" class="pill">0 open · 0 complete</span>
+        </div>
+        <div class="dashboard-grid">
+          <div>
+            <h3 class="subhead">Running Open Tasks</h3>
+            <div id="openSnapshot" class="snapshot-list"></div>
+            <h3 class="subhead spaced">Recently Completed</h3>
+            <div id="completedSnapshot" class="snapshot-list"></div>
+          </div>
+          <div>
+            <h3 class="subhead">Goal Mix Across Tasks</h3>
+            <p class="microcopy">Percentages are based on all open and completed tasks. A multi-goal task counts once for each goal it supports.</p>
+            <div id="goalMix" class="goal-mix"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="control-grid">
+        <div class="panel now-panel">
+          <div class="panel-heading">
+            <h2>Right Now</h2>
+            <button id="resetFilters" class="ghost-button">Reset</button>
+          </div>
+          <div class="field-grid">
+            <label>
+              Energy
+              <select id="energyFilter">
+                <option value="any">Any energy</option>
+                <option value="low">Low / woozy</option>
+                <option value="medium">Medium</option>
+                <option value="high">Focused</option>
+              </select>
+            </label>
+            <label>
+              Time
+              <select id="timeFilter">
+                <option value="any">Any time</option>
+                <option value="5">5 min</option>
+                <option value="15">15 min</option>
+                <option value="30">30 min</option>
+                <option value="60">1 hour</option>
+              </select>
+            </label>
+            <label>
+              Mode
+              <select id="modeFilter">
+                <option value="any">Any mode</option>
+                <option value="recovery">Recovery day</option>
+                <option value="out">Out and about</option>
+                <option value="computer">Computer</option>
+                <option value="body">Body task</option>
+                <option value="planning">Planning only</option>
+                <option value="social">Social/admin</option>
+              </select>
+            </label>
+            <label>
+              Goal
+              <select id="goalFilter">
+                <option value="any">Any goal</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="panel spin-panel">
+          <div class="panel-heading">
+            <h2>Spinner</h2>
+            <span id="matchCount" class="pill">0 options</span>
+          </div>
+          <div class="wheel-wrap">
+            <div id="wheel" class="wheel"></div>
+            <div class="pointer" aria-hidden="true"></div>
+          </div>
+          <button id="spinButton" class="primary-button">Spin a next thing</button>
+          <p id="spinResult" class="spin-result">Filter the list or spin from everything alive.</p>
+        </div>
+      </section>
+
+      <section class="workspace-grid">
+        <div class="panel task-panel">
+        <div class="panel-heading">
+          <h2>Options</h2>
+          <div class="button-row">
+            <button id="restoreStarters" class="ghost-button">Restore starters</button>
+            <button id="showAddForm" class="secondary-button">Add option</button>
+          </div>
+        </div>
+          <form id="taskForm" class="task-form hidden">
+            <input id="taskTitle" type="text" placeholder="What option/task/idea?" required />
+            <fieldset class="goal-picker">
+              <legend>Goals</legend>
+              <div id="taskGoalChoices" class="goal-choice-grid"></div>
+            </fieldset>
+            <select id="taskEnergy">
+              <option value="low">Low energy</option>
+              <option value="medium">Medium</option>
+              <option value="high">Focused</option>
+            </select>
+            <select id="taskTime">
+              <option value="5">5 min</option>
+              <option value="15">15 min</option>
+              <option value="30">30 min</option>
+              <option value="60">1 hour</option>
+            </select>
+            <select id="taskMode">
+              <option value="recovery">Recovery</option>
+              <option value="out">Out</option>
+              <option value="computer">Computer</option>
+              <option value="body">Body</option>
+              <option value="planning">Planning</option>
+              <option value="social">Social/admin</option>
+            </select>
+            <button class="primary-button" type="submit">Save</button>
+          </form>
+          <div id="taskList" class="task-list"></div>
+        </div>
+
+        <aside class="side-stack">
+          <div class="panel">
+            <div class="panel-heading">
+              <h2>Goals</h2>
+              <span class="pill">12</span>
+            </div>
+            <div id="goalList" class="goal-list"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-heading">
+              <h2>Today Counts</h2>
+              <button id="clearToday" class="ghost-button">Clear</button>
+            </div>
+            <form id="winForm" class="win-form">
+              <input id="winText" type="text" placeholder="Log a win, thought, or start" required />
+              <select id="winGoal"></select>
+              <button class="secondary-button" type="submit">Log</button>
+            </form>
+            <div id="todayLog" class="today-log"></div>
+          </div>
+        </aside>
+      </section>
+    </main>
+    <script>
+const goals = [
+  {
+    id: "career",
+    name: "Sustainable career",
+    counts: "Build toward well-paid sustainability work; strengthen portfolio and practical experience.",
+  },
+  {
+    id: "school",
+    name: "Finish school & certifications",
+    counts: "Complete SBST work, pursue scholarships, and advance useful AEE credentials.",
+  },
+  {
+    id: "network",
+    name: "Grow professional network",
+    counts: "Build genuine PNW sustainability relationships and maintain key contacts.",
+  },
+  {
+    id: "money",
+    name: "Financial security",
+    counts: "Increase income, manage expenses, and create more stability and choice.",
+  },
+  {
+    id: "seattle",
+    name: "Secure Seattle life",
+    counts: "Create a stable, functional, enjoyable home and life in Seattle.",
+  },
+  {
+    id: "body",
+    name: "Healthier, stronger body",
+    counts: "Move regularly, support sleep and nutrition, and follow through on health care.",
+  },
+  {
+    id: "meds",
+    name: "Consistent medication care",
+    counts: "Take and refill medications on time, including the weekly testosterone shot.",
+  },
+  {
+    id: "routines",
+    name: "ADHD-friendly routines",
+    counts: "Use systems that reduce friction for chores, laundry, planning, and daily care.",
+  },
+  {
+    id: "healing",
+    name: "Trauma healing",
+    counts: "Practice regulation, therapy skills, boundaries, and self-trust.",
+  },
+  {
+    id: "partnership",
+    name: "Reciprocal partnership",
+    counts: "Pursue secure, mutual, emotionally available romantic connection.",
+  },
+  {
+    id: "community",
+    name: "Chosen family & community",
+    counts: "Nurture friendships, queer community, family connection, and dependable support.",
+  },
+  {
+    id: "creative",
+    name: "Creative, adventurous life",
+    counts: "Write, bake sourdough, make things, explore, play, and deepen spiritual life.",
+  },
+];
+
+const states = ["Idea", "Thinking About", "Started", "Paused", "Waiting", "Done", "Dropped On Purpose"];
+const closedStates = new Set(["Done", "Dropped On Purpose"]);
+const storeKey = "paused-not-dropped-v1";
+
+const starterTasks = [
+  ["Rest and hydrate after vaccines", ["body"], "low", "15", "recovery", "Paused"],
+  ["Log today’s vaccine details", ["body", "meds"], "low", "5", "computer", "Done"],
+  ["Pick one tiny internship task", ["career", "school"], "medium", "15", "computer", "Idea"],
+  ["Mountaineers mechanical spreadsheet", ["school", "career"], "high", "60", "computer", "Started"],
+  ["Update internship hours tracker", ["career", "routines"], "medium", "15", "computer", "Started"],
+  ["Add portfolio note for SPR interview", ["career"], "medium", "30", "planning", "Thinking About"],
+  ["Clean one room surface", ["routines", "seattle"], "low", "5", "body", "Idea"],
+  ["Text one community person", ["community"], "low", "5", "social", "Idea"],
+  ["Take testosterone / check med refill", ["meds", "body"], "low", "5", "recovery", "Idea"],
+  ["Write a few lines or make a tiny thing", ["creative", "healing"], "low", "15", "planning", "Idea"],
+  ["Check what money thing needs attention", ["money"], "medium", "15", "computer", "Idea"],
+  ["Notice one boundary or regulation win", ["healing"], "low", "5", "recovery", "Idea"],
+].map(([title, goalIds, energy, time, mode, state], index) => ({
+  id: makeId(`task-${index}`),
+  title,
+  goalIds,
+  energy,
+  time,
+  mode,
+  state,
+  updatedAt: new Date().toISOString(),
+}));
+
+let model = loadModel();
+let rotation = 0;
+
+function loadModel() {
+  const stored = localStorage.getItem(storeKey);
+  if (stored) {
+    try {
+      return normalizeModel(JSON.parse(stored));
+    } catch {
+      localStorage.removeItem(storeKey);
+    }
+  }
+
+  return normalizeModel({
+    tasks: starterTasks,
+    today: [
+      {
+        id: "seed-vax",
+        text: "Vaccines counted as health progress, even with woozy energy.",
+        goal: "body",
+        at: new Date().toISOString(),
+      },
+    ],
+    activity: [],
+  });
+}
+
+function normalizeModel(raw) {
+  const tasks = Array.isArray(raw.tasks) && raw.tasks.length ? raw.tasks : starterTasks;
+  return {
+    tasks: tasks.map((task) => ({
+      ...task,
+      goalIds: normalizeGoals(task.goalIds || task.goals || task.goal),
+      updatedAt: task.updatedAt || new Date().toISOString(),
+    })),
+    today: Array.isArray(raw.today) ? raw.today : [],
+    activity: Array.isArray(raw.activity) ? raw.activity : [],
+  };
+}
+
+function normalizeGoals(value) {
+  const values = Array.isArray(value) ? value : [value];
+  const valid = values.filter((id) => goals.some((goal) => goal.id === id));
+  return valid.length ? [...new Set(valid)] : ["career"];
+}
+
+function makeId(prefix) {
+  if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function saveModel() {
+  localStorage.setItem(storeKey, JSON.stringify(model));
+}
+
+function goalName(id) {
+  return goals.find((goal) => goal.id === id)?.name || id;
+}
+
+function taskGoalIds(task) {
+  return normalizeGoals(task.goalIds || task.goal);
+}
+
+function taskGoalNames(task) {
+  return taskGoalIds(task).map(goalName).join(" / ");
+}
+
+function energyRank(value) {
+  return { low: 1, medium: 2, high: 3 }[value] || 3;
+}
+
+function stateClass(state) {
+  return state.toLowerCase().replaceAll(" ", "-");
+}
+
+function currentFilters() {
+  return {
+    energy: document.querySelector("#energyFilter").value,
+    time: document.querySelector("#timeFilter").value,
+    mode: document.querySelector("#modeFilter").value,
+    goal: document.querySelector("#goalFilter").value,
+  };
+}
+
+function openTasks() {
+  return model.tasks.filter((task) => !closedStates.has(task.state));
+}
+
+function completedTasks() {
+  return model.tasks
+    .filter((task) => closedStates.has(task.state))
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+}
+
+function matchingTasks() {
+  const filters = currentFilters();
+  return openTasks().filter((task) => {
+    if (filters.energy !== "any" && energyRank(task.energy) > energyRank(filters.energy)) return false;
+    if (filters.time !== "any" && Number(task.time) > Number(filters.time)) return false;
+    if (filters.mode !== "any" && task.mode !== filters.mode) return false;
+    if (filters.goal !== "any" && !taskGoalIds(task).includes(filters.goal)) return false;
+    return true;
+  });
+}
+
+function populateSelects() {
+  const goalFilter = document.querySelector("#goalFilter");
+  const winGoal = document.querySelector("#winGoal");
+  const goalChoices = document.querySelector("#taskGoalChoices");
+
+  for (const goal of goals) {
+    goalFilter.add(new Option(goal.name, goal.id));
+    winGoal.add(new Option(goal.name, goal.id));
+    goalChoices.insertAdjacentHTML(
+      "beforeend",
+      `<label><input type="checkbox" name="taskGoals" value="${goal.id}" />${goal.name}</label>`,
+    );
+  }
+
+  goalChoices.querySelector('input[value="career"]').checked = true;
+}
+
+function renderDashboard() {
+  const open = openTasks();
+  const complete = completedTasks();
+  document.querySelector("#taskCounts").textContent = `${open.length} open · ${complete.length} complete`;
+  renderOpenSnapshot(open);
+  renderCompletedSnapshot(complete);
+  renderGoalMix(open, complete);
+}
+
+function renderOpenSnapshot(open) {
+  const snapshot = [...open]
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    .slice(0, 8);
+
+  document.querySelector("#openSnapshot").innerHTML = snapshot.length
+    ? snapshot.map((task) => snapshotRow(task)).join("")
+    : `<div class="empty">No running open tasks.</div>`;
+}
+
+function renderCompletedSnapshot(complete) {
+  const snapshot = complete.slice(0, 6);
+
+  document.querySelector("#completedSnapshot").innerHTML = snapshot.length
+    ? snapshot.map((task) => snapshotRow(task)).join("")
+    : `<div class="empty">Recently completed tasks will land here.</div>`;
+}
+
+function snapshotRow(task) {
+  return `
+    <div class="snapshot-row">
+      <span>
+        <strong>${escapeHtml(task.title)}</strong>
+        <small>${escapeHtml(taskGoalNames(task))}</small>
+      </span>
+      <span class="change-state ${stateClass(task.state)}">${escapeHtml(task.state)}</span>
+    </div>
+  `;
+}
+
+function renderGoalMix(open, complete) {
+  const goalMix = document.querySelector("#goalMix");
+  const tracked = [...open, ...complete];
+  if (!tracked.length) {
+    goalMix.innerHTML = `<div class="empty">No open or completed tasks yet.</div>`;
+    return;
+  }
+
+  const openCounts = new Map(goals.map((goal) => [goal.id, 0]));
+  const completeCounts = new Map(goals.map((goal) => [goal.id, 0]));
+  for (const task of open) {
+    for (const id of taskGoalIds(task)) openCounts.set(id, (openCounts.get(id) || 0) + 1);
+  }
+  for (const task of complete) {
+    for (const id of taskGoalIds(task)) completeCounts.set(id, (completeCounts.get(id) || 0) + 1);
+  }
+
+  goalMix.innerHTML = goals
+    .map((goal) => {
+      const openCount = openCounts.get(goal.id) || 0;
+      const completeCount = completeCounts.get(goal.id) || 0;
+      const totalCount = openCount + completeCount;
+      if (!totalCount) return "";
+      const percent = Math.round((totalCount / tracked.length) * 100);
+      const openWidth = (openCount / totalCount) * 100;
+      const completeWidth = (completeCount / totalCount) * 100;
+      return `
+        <div class="mix-row">
+          <span class="mix-label">${goal.name}</span>
+          <span class="mix-bar" title="${openCount} open, ${completeCount} complete">
+            <span class="mix-fill open" style="width:${openWidth}%"></span>
+            <span class="mix-fill complete" style="width:${completeWidth}%"></span>
+          </span>
+          <span class="mix-value">${percent}% · ${totalCount}</span>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function renderGoals() {
+  const touched = new Set(model.today.map((item) => item.goal));
+  document.querySelector("#goalList").innerHTML = goals
+    .map((goal) => {
+      const active = touched.has(goal.id);
+      return `
+        <div class="goal-item">
+          <strong>${active ? "Today: " : ""}${goal.name}</strong>
+          <small>${goal.counts}</small>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function renderTasks() {
+  const list = document.querySelector("#taskList");
+  const matches = matchingTasks();
+  const matchIds = new Set(matches.map((task) => task.id));
+  const openSorted = openTasks().sort((a, b) => {
+    const matchDelta = Number(matchIds.has(b.id)) - Number(matchIds.has(a.id));
+    if (matchDelta) return matchDelta;
+    return new Date(b.updatedAt) - new Date(a.updatedAt);
+  });
+  const closedSorted = completedTasks();
+
+  document.querySelector("#matchCount").textContent = `${matches.length} option${matches.length === 1 ? "" : "s"}`;
+
+  let html = "";
+  if (!matches.length && openSorted.length) {
+    html += `<div class="empty"><strong>No open options match those filters.</strong>Try resetting filters, choosing a bigger time window, or changing the goal.</div>`;
+  }
+
+  html += `<div class="task-section-title"><span>Open Tasks</span><span>${openSorted.length}</span></div>`;
+  html += openSorted.length
+    ? openSorted.map((task) => taskCard(task, matchIds.has(task.id))).join("")
+    : `<div class="empty">No open tasks. That is allowed to count as spacious.</div>`;
+
+  html += `<div class="task-section-title"><span>Completed / Released</span><span>${closedSorted.length}</span></div>`;
+  html += closedSorted.length
+    ? closedSorted.map((task) => taskCard(task, false, true)).join("")
+    : `<div class="empty">Completed tasks will move here newest first.</div>`;
+
+  list.innerHTML = html;
+  renderWheel(matches);
+}
+
+function taskCard(task, isMatch, isCompleted = false) {
+  return `
+    <article class="task-card ${isCompleted ? "completed" : ""}" data-task-id="${task.id}">
+      <div>
+        <h3>${escapeHtml(task.title)}</h3>
+        <div class="meta-row">
+          <span class="tag">${escapeHtml(taskGoalNames(task))}</span>
+          <span class="tag">${task.energy} energy</span>
+          <span class="tag">${task.time} min</span>
+          <span class="tag">${task.mode}</span>
+          ${isMatch ? `<span class="tag">matches filters</span>` : ""}
+        </div>
+        <div class="state-row" aria-label="Task state">
+          ${states
+            .map(
+              (state) => `<button class="state-button ${task.state === state ? "active" : ""}" data-state="${state}">${state}</button>`,
+            )
+            .join("")}
+        </div>
+      </div>
+      <button class="delete-button" title="Delete option" data-delete="${task.id}">×</button>
+    </article>
+  `;
+}
+
+function renderWheel(matches) {
+  const wheel = document.querySelector("#wheel");
+  const colors = ["#2f7d68", "#f4d06f", "#264d73", "#b86443", "#4fb286", "#10262b"];
+  if (!matches.length) {
+    wheel.style.background = "#d8e3df";
+    return;
+  }
+
+  const slice = 100 / matches.length;
+  const gradient = matches
+    .map((_, index) => {
+      const start = (slice * index).toFixed(2);
+      const end = (slice * (index + 1)).toFixed(2);
+      return `${colors[index % colors.length]} ${start}% ${end}%`;
+    })
+    .join(", ");
+  wheel.style.background = `conic-gradient(${gradient})`;
+}
+
+function renderToday() {
+  const log = document.querySelector("#todayLog");
+  const touched = new Set(model.today.map((item) => item.goal));
+  document.querySelector("#todayCount").textContent = `${touched.size} goal${touched.size === 1 ? "" : "s"}`;
+  document.querySelector("#todayNote").textContent = touched.size
+    ? [...touched].map(goalName).join(" · ")
+    : "Log a win or mark a task to start the receipt trail.";
+
+  log.innerHTML = model.today.length
+    ? model.today
+        .slice()
+        .reverse()
+        .map(
+          (item) => `
+          <div class="log-item">
+            <strong>${escapeHtml(item.text)}</strong>
+            <small>${goalName(item.goal)}</small>
+          </div>
+        `,
+        )
+        .join("")
+    : `<div class="empty">Nothing logged today yet. Recovery, starts, pauses, and thoughts can all count.</div>`;
+}
+
+function recordActivity(title, state, goalIds) {
+  model.activity.push({
+    id: makeId("activity"),
+    title,
+    state,
+    goalIds,
+    at: new Date().toISOString(),
+  });
+  model.activity = model.activity.slice(-80);
+}
+
+function logWin(text, goal) {
+  model.today.push({
+    id: makeId("win"),
+    text,
+    goal,
+    at: new Date().toISOString(),
+  });
+  recordActivity(text, "Today Counts", [goal]);
+  saveModel();
+  renderAll();
+}
+
+function renderAll() {
+  renderDashboard();
+  renderGoals();
+  renderTasks();
+  renderToday();
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char];
+  });
+}
+
+function formatTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function selectedTaskGoals() {
+  const selected = [...document.querySelectorAll('input[name="taskGoals"]:checked')].map((input) => input.value);
+  return selected.length ? selected : ["career"];
+}
+
+function resetTaskGoalChoices() {
+  document.querySelectorAll('input[name="taskGoals"]').forEach((input) => {
+    input.checked = input.value === "career";
+  });
+}
+
+function bindEvents() {
+  ["#energyFilter", "#timeFilter", "#modeFilter", "#goalFilter"].forEach((selector) => {
+    document.querySelector(selector).addEventListener("change", renderAll);
+  });
+
+  document.querySelector("#resetFilters").addEventListener("click", () => {
+    document.querySelector("#energyFilter").value = "any";
+    document.querySelector("#timeFilter").value = "any";
+    document.querySelector("#modeFilter").value = "any";
+    document.querySelector("#goalFilter").value = "any";
+    renderAll();
+  });
+
+  document.querySelector("#showAddForm").addEventListener("click", () => {
+    document.querySelector("#taskForm").classList.toggle("hidden");
+  });
+
+  document.querySelector("#taskForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const task = {
+      id: makeId("task"),
+      title: document.querySelector("#taskTitle").value.trim(),
+      goalIds: selectedTaskGoals(),
+      energy: document.querySelector("#taskEnergy").value,
+      time: document.querySelector("#taskTime").value,
+      mode: document.querySelector("#taskMode").value,
+      state: "Idea",
+      updatedAt: new Date().toISOString(),
+    };
+    model.tasks.unshift(task);
+    recordActivity(task.title, "Added", task.goalIds);
+    event.currentTarget.reset();
+    resetTaskGoalChoices();
+    saveModel();
+    renderAll();
+  });
+
+  document.querySelector("#restoreStarters").addEventListener("click", () => {
+    const existingTitles = new Set(model.tasks.map((task) => task.title));
+    const missing = starterTasks
+      .filter((task) => !existingTitles.has(task.title))
+      .map((task, index) => ({ ...task, id: makeId(`restored-${index}`), updatedAt: new Date().toISOString() }));
+    model.tasks = [...missing, ...model.tasks];
+    for (const task of missing) recordActivity(task.title, "Restored", task.goalIds);
+    saveModel();
+    renderAll();
+    document.querySelector("#spinResult").textContent = missing.length
+      ? `Restored ${missing.length} starter option${missing.length === 1 ? "" : "s"}.`
+      : "Starter options are already in the list.";
+  });
+
+  document.querySelector("#taskList").addEventListener("click", (event) => {
+    const state = event.target.dataset.state;
+    const deleteId = event.target.dataset.delete;
+    const card = event.target.closest("[data-task-id]");
+    if (deleteId) {
+      const task = model.tasks.find((item) => item.id === deleteId);
+      model.tasks = model.tasks.filter((item) => item.id !== deleteId);
+      if (task) recordActivity(task.title, "Deleted", taskGoalIds(task));
+      saveModel();
+      renderAll();
+      return;
+    }
+    if (!state || !card) return;
+
+    const task = model.tasks.find((item) => item.id === card.dataset.taskId);
+    if (!task) return;
+    task.goalIds = taskGoalIds(task);
+    task.state = state;
+    task.updatedAt = new Date().toISOString();
+    recordActivity(task.title, state, task.goalIds);
+    if (["Started", "Done", "Paused"].includes(state)) {
+      model.today.push({
+        id: makeId("win"),
+        text: `${state}: ${task.title}`,
+        goal: task.goalIds[0],
+        at: new Date().toISOString(),
+      });
+    }
+    saveModel();
+    renderAll();
+  });
+
+  document.querySelector("#winForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const input = document.querySelector("#winText");
+    logWin(input.value.trim(), document.querySelector("#winGoal").value);
+    input.value = "";
+  });
+
+  document.querySelector("#clearToday").addEventListener("click", () => {
+    model.today = [];
+    saveModel();
+    renderAll();
+  });
+
+  document.querySelector("#spinButton").addEventListener("click", () => {
+    const matches = matchingTasks();
+    if (!matches.length) {
+      document.querySelector("#spinResult").textContent = "No open options match those filters.";
+      return;
+    }
+    const pick = matches[Math.floor(Math.random() * matches.length)];
+    rotation += 720 + Math.floor(Math.random() * 360);
+    document.querySelector("#wheel").style.transform = `rotate(${rotation}deg)`;
+    document.querySelector("#spinResult").textContent = pick.title;
+    recordActivity(pick.title, "Spun", taskGoalIds(pick));
+    saveModel();
+    renderAll();
+  });
+}
+
+model = normalizeModel(model);
+saveModel();
+populateSelects();
+bindEvents();
+renderAll();
+
+    </script>
+  </body>
+</html>
