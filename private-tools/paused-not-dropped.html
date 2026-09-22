@@ -510,6 +510,7 @@ button {
 }
 
 .change-state.started,
+.change-state.made-progress,
 .change-state.done,
 .change-state.added,
 .change-state.restored,
@@ -646,7 +647,30 @@ button {
 }
 
 @media (max-width: 520px) {
-  .app-shell {
+  .home-link-bar {
+  width: min(1180px, calc(100% - 28px));
+  margin: 14px auto 0;
+}
+
+.home-link-bar a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--green);
+  font-size: 0.88rem;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.home-link-bar a:hover {
+  background: #fff;
+}
+
+.app-shell {
     width: min(100% - 18px, 1180px);
     padding-top: 12px;
   }
@@ -889,7 +913,7 @@ const goals = [
   },
 ];
 
-const states = ["Idea", "Thinking About", "Started", "Paused", "Waiting", "Done", "Dropped On Purpose"];
+const states = ["Idea", "Thinking About", "Started", "Made Progress", "Paused", "Waiting", "Done", "Dropped On Purpose"];
 const closedStates = new Set(["Done", "Dropped On Purpose"]);
 const storeKey = "paused-not-dropped-v1";
 
@@ -1017,7 +1041,7 @@ function matchingTasks() {
   const filters = currentFilters();
   return openTasks().filter((task) => {
     if (filters.energy !== "any" && energyRank(task.energy) > energyRank(filters.energy)) return false;
-    if (filters.time !== "any" && Number(task.time) > Number(task.time)) return false;
+    if (filters.time !== "any" && Number(task.time) > Number(filters.time)) return false;
     if (filters.mode !== "any" && task.mode !== filters.mode) return false;
     if (filters.goal !== "any" && !taskGoalIds(task).includes(filters.goal)) return false;
     return true;
@@ -1359,7 +1383,7 @@ function bindEvents() {
     task.state = state;
     task.updatedAt = new Date().toISOString();
     recordActivity(task.title, state, task.goalIds);
-    if (["Started", "Done", "Paused"].includes(state)) {
+    if (["Started", "Made Progress", "Done", "Paused"].includes(state)) {
       model.today.push({
         id: makeId("win"),
         text: `${state}: ${task.title}`,
@@ -1409,3 +1433,4 @@ renderAll();
     </script>
   </body>
 </html>
+
