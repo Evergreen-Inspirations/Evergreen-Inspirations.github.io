@@ -901,7 +901,10 @@ button {
             </div>
             <form id="winForm" class="win-form">
               <input id="winText" type="text" placeholder="Log a win, thought, or start" required />
-              <select id="winGoal"></select>
+              <fieldset class="goal-picker">
+                <legend>Goals</legend>
+                <div id="winGoalChoices" class="goal-choice-grid"></div>
+              </fieldset>
               <select id="winStatus"></select>
               <select id="winEnergy"><option value="low">Low energy</option><option value="medium">Medium</option><option value="high">Focused</option></select>
               <select id="winTime"><option value="5">5 min</option><option value="15">15 min</option><option value="30">30 min</option><option value="60">1 hour</option></select>
@@ -1115,16 +1118,19 @@ function matchingTasks() {
 
 function populateSelects() {
   const goalFilter = document.querySelector("#goalFilter");
-  const winGoal = document.querySelector("#winGoal");
   const winStatus = document.querySelector("#winStatus");
   const goalChoices = document.querySelector("#taskGoalChoices");
+  const winGoalChoices = document.querySelector("#winGoalChoices");
 
   for (const goal of goals) {
     goalFilter.add(new Option(goal.name, goal.id));
-    winGoal.add(new Option(goal.name, goal.id));
     goalChoices.insertAdjacentHTML(
       "beforeend",
       `<label><input type="checkbox" name="taskGoals" value="${goal.id}" />${goal.name}</label>`,
+    );
+    winGoalChoices.insertAdjacentHTML(
+      "beforeend",
+      `<label><input type="checkbox" name="winGoals" value="${goal.id}" />${goal.name}</label>`,
     );
   }
 
@@ -1134,6 +1140,7 @@ function populateSelects() {
   winStatus.value = "Made Progress";
 
   goalChoices.querySelector('input[value="career"]').checked = true;
+  winGoalChoices.querySelector('input[value="routines"]').checked = true;
 }
 
 function renderDashboard() {
@@ -1231,7 +1238,7 @@ function renderGoalMix(open, complete) {
 }
 
 function renderGoals() {
-  const touched = new Set(model.today.map((item) => item.goal));
+  const touched = new Set(model.today.flatMap((item) => normalizeGoals(item.goalIds || item.goal)));
   document.querySelector("#goalList").innerHTML = goals
     .map((goal) => {
       const active = touched.has(goal.id);
@@ -1354,7 +1361,7 @@ function renderToday() {
           (item) => `
           <div class="log-item">
             <strong>${escapeHtml(item.text)}</strong>
-            <small>${goalName(item.goal)}${item.state ? ` · ${item.state}` : ""}</small>
+            <small>${normalizeGoals(item.goalIds || item.goal).map(goalName).join(" / ")}${item.state ? ` · ${item.state}` : ""}</small>
           </div>
         `,
         )
@@ -1373,9 +1380,9 @@ function recordActivity(title, state, goalIds) {
   model.activity = model.activity.slice(-80);
 }
 
-function logWin(text, goal, state = "Made Progress", energy = "low", time = "5", mode = "planning") {
+function logWin(text, goalIds, state = "Made Progress", energy = "low", time = "5", mode = "planning") {
   const now = new Date().toISOString();
-  const goalIds = [goal];
+  goalIds = normalizeGoals(goalIds);
   const task = {
     id: makeId("task"),
     title: text,
@@ -1391,7 +1398,8 @@ function logWin(text, goal, state = "Made Progress", energy = "low", time = "5",
   model.today.push({
     id: makeId("win"),
     text,
-    goal,
+    goal: goalIds[0],
+    goalIds,
     state,
     at: now,
     taskId: task.id,
@@ -1425,9 +1433,20 @@ function selectedTaskGoals() {
   return selected.length ? selected : ["career"];
 }
 
+function selectedWinGoals() {
+  const selected = [...document.querySelectorAll('input[name="winGoals"]:checked')].map((input) => input.value);
+  return selected.length ? selected : ["routines"];
+}
+
 function resetTaskGoalChoices() {
   document.querySelectorAll('input[name="taskGoals"]').forEach((input) => {
     input.checked = input.value === "career";
+  });
+}
+
+function resetWinGoalChoices() {
+  document.querySelectorAll('input[name="winGoals"]').forEach((input) => {
+    input.checked = input.value === "routines";
   });
 }
 
@@ -1571,6 +1590,7 @@ function bindEvents() {
         id: makeId("win"),
         text: `${state}: ${task.title}`,
         goal: task.goalIds[0],
+        goalIds: task.goalIds,
         at: new Date().toISOString(),
       });
     }
@@ -1583,7 +1603,7 @@ function bindEvents() {
     const input = document.querySelector("#winText");
     logWin(
       input.value.trim(),
-      document.querySelector("#winGoal").value,
+      selectedWinGoals(),
       document.querySelector("#winStatus").value,
       document.querySelector("#winEnergy").value,
       document.querySelector("#winTime").value,
@@ -1594,6 +1614,7 @@ function bindEvents() {
     document.querySelector("#winEnergy").value = "low";
     document.querySelector("#winTime").value = "5";
     document.querySelector("#winMode").value = "planning";
+    resetWinGoalChoices();
   });
 
   document.querySelector("#clearToday").addEventListener("click", () => {
