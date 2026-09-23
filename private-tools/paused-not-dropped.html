@@ -897,7 +897,10 @@ button {
           <div class="panel">
             <div class="panel-heading">
               <h2>Today Counts</h2>
-              <button id="clearToday" class="ghost-button">Clear</button>
+              <div class="button-row">
+                <button id="restoreTodayProgress" class="ghost-button">Restore today</button>
+                <button id="clearToday" class="ghost-button">Clear</button>
+              </div>
             </div>
             <form id="winForm" class="win-form">
               <input id="winText" type="text" placeholder="Log a win, thought, or start" required />
@@ -1007,6 +1010,105 @@ const starterTasks = [
   state,
   updatedAt: new Date().toISOString(),
 }));
+
+const todayRecoveryItems = [
+  {
+    title: "Mountaineers systems list: finished current pass and tagged team for missing photos",
+    goalIds: ["career", "school", "routines"],
+    state: "Completed",
+    energy: "high",
+    time: "60",
+    mode: "computer",
+  },
+  {
+    title: "Rollerbladed with Gene and Elaine",
+    goalIds: ["body", "community", "creative"],
+    state: "Completed",
+    energy: "medium",
+    time: "60",
+    mode: "body",
+  },
+  {
+    title: "Watered P-Patch Giving Garden for 30 minutes",
+    goalIds: ["community", "body", "healing"],
+    state: "Completed",
+    energy: "medium",
+    time: "30",
+    mode: "body",
+  },
+  {
+    title: "Took a shower",
+    goalIds: ["body", "routines"],
+    state: "Completed",
+    energy: "low",
+    time: "15",
+    mode: "recovery",
+  },
+  {
+    title: "Finished laundry",
+    goalIds: ["routines", "seattle"],
+    state: "Completed",
+    energy: "medium",
+    time: "30",
+    mode: "body",
+  },
+  {
+    title: "Cleaned and reset room for school year",
+    goalIds: ["seattle", "routines", "school"],
+    state: "Completed",
+    energy: "medium",
+    time: "60",
+    mode: "body",
+  },
+  {
+    title: "Took out recycling",
+    goalIds: ["routines", "seattle"],
+    state: "Completed",
+    energy: "low",
+    time: "5",
+    mode: "body",
+  },
+  {
+    title: "Ordered school book on Amazon",
+    goalIds: ["school"],
+    state: "Completed",
+    energy: "low",
+    time: "5",
+    mode: "computer",
+  },
+  {
+    title: "Ordered new work/school shoes",
+    goalIds: ["seattle", "body"],
+    state: "Completed",
+    energy: "low",
+    time: "15",
+    mode: "computer",
+  },
+  {
+    title: "Ordered ashwagandha",
+    goalIds: ["body", "routines"],
+    state: "Completed",
+    energy: "low",
+    time: "5",
+    mode: "computer",
+  },
+  {
+    title: "Felt able to exhale because tasks are outside my head",
+    goalIds: ["routines", "healing"],
+    state: "Made Progress",
+    energy: "low",
+    time: "5",
+    mode: "recovery",
+  },
+  {
+    title: "Do the dishes",
+    goalIds: ["routines", "seattle"],
+    state: "Thinking About",
+    energy: "low",
+    time: "30",
+    mode: "body",
+  },
+];
 
 let model = loadModel();
 let rotation = 0;
@@ -1347,7 +1449,7 @@ function renderWheel(matches) {
 
 function renderToday() {
   const log = document.querySelector("#todayLog");
-  const touched = new Set(model.today.map((item) => item.goal));
+  const touched = new Set(model.today.flatMap((item) => normalizeGoals(item.goalIds || item.goal)));
   document.querySelector("#todayCount").textContent = `${touched.size} goal${touched.size === 1 ? "" : "s"}`;
   document.querySelector("#todayNote").textContent = touched.size
     ? [...touched].map(goalName).join(" · ")
@@ -1492,6 +1594,44 @@ function setupCollapsibleSections() {
   });
 }
 
+function restoreTodayProgress() {
+  const existingTitles = new Set(model.tasks.map((task) => task.title));
+  const now = new Date().toISOString();
+  const restored = [];
+
+  for (const item of todayRecoveryItems) {
+    if (existingTitles.has(item.title)) continue;
+    const task = {
+      id: makeId("task"),
+      title: item.title,
+      goalIds: item.goalIds,
+      energy: item.energy,
+      time: item.time,
+      mode: item.mode,
+      state: item.state,
+      updatedAt: now,
+    };
+    model.tasks.unshift(task);
+    model.today.push({
+      id: makeId("win"),
+      text: item.title,
+      goal: item.goalIds[0],
+      goalIds: item.goalIds,
+      state: item.state,
+      at: now,
+      taskId: task.id,
+    });
+    recordActivity(item.title, item.state, item.goalIds);
+    restored.push(task);
+  }
+
+  saveModel();
+  renderAll();
+  document.querySelector("#spinResult").textContent = restored.length
+    ? `Restored ${restored.length} progress item${restored.length === 1 ? "" : "s"} from chat.`
+    : "Those progress items are already in the app.";
+}
+
 function bindEvents() {
   ["#energyFilter", "#timeFilter", "#modeFilter", "#goalFilter"].forEach((selector) => {
     document.querySelector(selector).addEventListener("change", renderAll);
@@ -1616,6 +1756,8 @@ function bindEvents() {
     document.querySelector("#winMode").value = "planning";
     resetWinGoalChoices();
   });
+
+  document.querySelector("#restoreTodayProgress").addEventListener("click", restoreTodayProgress);
 
   document.querySelector("#clearToday").addEventListener("click", () => {
     model.today = [];
