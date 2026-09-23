@@ -928,6 +928,23 @@ button {
 
           <div class="panel">
             <div class="panel-heading">
+              <h2>Sync</h2>
+              <span class="pill">Google Sheet</span>
+            </div>
+            <div class="backup-actions">
+              <input id="syncUrl" type="url" placeholder="Apps Script web app URL" />
+              <input id="syncKey" type="password" placeholder="Sync key" />
+              <div class="button-row">
+                <button id="saveSyncSettings" class="ghost-button" type="button">Save sync settings</button>
+                <button id="loadFromSheet" class="secondary-button" type="button">Load from Sheet</button>
+                <button id="saveToSheet" class="primary-button" type="button">Save to Sheet</button>
+              </div>
+              <p class="microcopy">Use the same Web App URL and sync key on each device.</p>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-heading">
               <h2>Backup</h2>
               <span class="pill">device data</span>
             </div>
@@ -1702,6 +1719,97 @@ function importBackup() {
   reader.readAsText(file);
 }
 
+const syncSettingsKey = "paused-not-dropped-sync-settings";
+
+function loadSyncSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(syncSettingsKey)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveSyncSettings() {
+  const settings = {
+    url: document.querySelector("#syncUrl").value.trim(),
+    key: document.querySelector("#syncKey").value.trim(),
+  };
+  localStorage.setItem(syncSettingsKey, JSON.stringify(settings));
+  document.querySelector("#spinResult").textContent = "Sync settings saved.";
+}
+
+function populateSyncSettings() {
+  const settings = loadSyncSettings();
+  document.querySelector("#syncUrl").value = settings.url || "";
+  document.querySelector("#syncKey").value = settings.key || "";
+}
+
+function syncSettingsOrMessage() {
+  const settings = {
+    url: document.querySelector("#syncUrl").value.trim(),
+    key: document.querySelector("#syncKey").value.trim(),
+  };
+  if (!settings.url || !settings.key) {
+    document.querySelector("#spinResult").textContent = "Add the Web App URL and sync key first.";
+    return null;
+  }
+  localStorage.setItem(syncSettingsKey, JSON.stringify(settings));
+  return settings;
+}
+
+function saveToSheet() {
+  const settings = syncSettingsOrMessage();
+  if (!settings) return;
+
+  const form = new FormData();
+  form.append("action", "save");
+  form.append("key", settings.key);
+  form.append("payload", JSON.stringify(backupPayload()));
+
+  fetch(settings.url, {
+    method: "POST",
+    mode: "no-cors",
+    body: form,
+  });
+
+  document.querySelector("#spinResult").textContent = "Save sent to Google Sheet. Load from Sheet on another device after a moment.";
+}
+
+function loadFromSheet() {
+  const settings = syncSettingsOrMessage();
+  if (!settings) return;
+
+  const callbackName = `pausedSyncCallback_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const script = document.createElement("script");
+
+  window[callbackName] = (response) => {
+    try {
+      if (!response || response.ok === false) throw new Error(response?.error || "Sync failed.");
+      model = normalizeModel(response.model);
+      saveModel();
+      renderAll();
+      document.querySelector("#spinResult").textContent = "Loaded from Google Sheet.";
+    } catch (error) {
+      document.querySelector("#spinResult").textContent = "Could not load from Google Sheet.";
+    } finally {
+      delete window[callbackName];
+      script.remove();
+    }
+  };
+
+  const url = new URL(settings.url);
+  url.searchParams.set("action", "load");
+  url.searchParams.set("key", settings.key);
+  url.searchParams.set("callback", callbackName);
+  script.onerror = () => {
+    delete window[callbackName];
+    script.remove();
+    document.querySelector("#spinResult").textContent = "Could not reach the Google Sheet sync.";
+  };
+  script.src = url.toString();
+  document.body.appendChild(script);
+}
+
 function bindEvents() {
   ["#energyFilter", "#timeFilter", "#modeFilter", "#goalFilter"].forEach((selector) => {
     document.querySelector(selector).addEventListener("change", renderAll);
@@ -1828,6 +1936,9 @@ function bindEvents() {
   });
 
   document.querySelector("#restoreTodayProgress").addEventListener("click", restoreTodayProgress);
+  document.querySelector("#saveSyncSettings").addEventListener("click", saveSyncSettings);
+  document.querySelector("#saveToSheet").addEventListener("click", saveToSheet);
+  document.querySelector("#loadFromSheet").addEventListener("click", loadFromSheet);
   document.querySelector("#exportBackup").addEventListener("click", exportBackup);
   document.querySelector("#importBackup").addEventListener("click", importBackup);
 
@@ -1857,6 +1968,7 @@ model = normalizeModel(model);
 saveModel();
 populateSelects();
 setupCollapsibleSections();
+populateSyncSettings();
 bindEvents();
 renderAll();
 
