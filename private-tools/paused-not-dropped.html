@@ -43,7 +43,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -255,7 +256,8 @@ label {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   min-height: 42px;
   border: 1px solid var(--line);
@@ -263,6 +265,12 @@ select {
   background: #fff;
   color: var(--ink);
   padding: 0 12px;
+}
+
+textarea {
+  min-height: 120px;
+  padding: 10px 12px;
+  resize: vertical;
 }
 
 button {
@@ -403,7 +411,8 @@ button {
 
 .task-list,
 .goal-list,
-.today-log {
+.today-log,
+.backup-actions {
   display: grid;
   gap: 10px;
 }
@@ -915,6 +924,19 @@ button {
               <button class="secondary-button" type="submit">Log</button>
             </form>
             <div id="todayLog" class="today-log"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-heading">
+              <h2>Backup</h2>
+              <span class="pill">device data</span>
+            </div>
+            <div class="backup-actions">
+              <button id="exportBackup" class="secondary-button" type="button">Download backup</button>
+              <input id="importBackupFile" type="file" accept="application/json,.json" />
+              <button id="importBackup" class="primary-button" type="button">Import backup</button>
+              <p class="microcopy">Use this to move your saved app data between phone and computer.</p>
+            </div>
           </div>
         </aside>
       </section>
@@ -1632,6 +1654,54 @@ function restoreTodayProgress() {
     : "Those progress items are already in the app.";
 }
 
+function backupPayload() {
+  return {
+    app: "Paused Not Dropped",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    model: normalizeModel(model),
+  };
+}
+
+function exportBackup() {
+  const payload = JSON.stringify(backupPayload(), null, 2);
+  const blob = new Blob([payload], { type: "application/json" });
+  const date = new Date().toISOString().slice(0, 10);
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `paused-not-dropped-backup-${date}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(link.href);
+  document.querySelector("#spinResult").textContent = "Backup downloaded.";
+}
+
+function importBackup() {
+  const input = document.querySelector("#importBackupFile");
+  const file = input.files && input.files[0];
+  if (!file) {
+    document.querySelector("#spinResult").textContent = "Choose a backup file first.";
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    try {
+      const parsed = JSON.parse(String(reader.result || ""));
+      const nextModel = parsed.model || parsed;
+      if (!nextModel || !Array.isArray(nextModel.tasks)) throw new Error("No task data found.");
+      model = normalizeModel(nextModel);
+      saveModel();
+      renderAll();
+      document.querySelector("#spinResult").textContent = "Backup imported.";
+    } catch (error) {
+      document.querySelector("#spinResult").textContent = "That backup could not be imported.";
+    }
+  });
+  reader.readAsText(file);
+}
+
 function bindEvents() {
   ["#energyFilter", "#timeFilter", "#modeFilter", "#goalFilter"].forEach((selector) => {
     document.querySelector(selector).addEventListener("change", renderAll);
@@ -1758,6 +1828,8 @@ function bindEvents() {
   });
 
   document.querySelector("#restoreTodayProgress").addEventListener("click", restoreTodayProgress);
+  document.querySelector("#exportBackup").addEventListener("click", exportBackup);
+  document.querySelector("#importBackup").addEventListener("click", importBackup);
 
   document.querySelector("#clearToday").addEventListener("click", () => {
     model.today = [];
