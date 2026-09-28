@@ -2,7 +2,9 @@
 
 ## Implemented
 - Today, Health and Care Team navigation in the existing single-file app.
-- Dated capacity (-100 to 100), progress (0 to 100), mood and context check-ins.
+- Dated capacity in named 10-point steps (-100 ER visit to +100 everything wanted), mood and context check-ins.
+- Goal progress derived from task statuses: completed / non-dropped tasks, with all status counts shown. Tasks count equally per linked goal; historical manually entered progress stays in saved data but is no longer used.
+- Task status dropdowns and a Touched today badge based on local calendar dates, excluding old or undated log entries.
 - Achievement, maintenance, health, recovery, connection, joy and care entries.
 - Symptom episodes with context, interventions, impact, timestamped updates and resolution.
 - Providers, linked appointments, questions, notes, orders and follow-up dates.
