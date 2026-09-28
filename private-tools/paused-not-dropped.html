@@ -749,6 +749,44 @@ button {
   }
 }
 
+[hidden] { display: none !important; }
+.life-nav { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 20px; }
+.life-nav button { border:1px solid var(--line); border-radius:999px; background:white; color:var(--ink); padding:12px 22px; cursor:pointer; font-weight:750; }
+.life-nav button[aria-pressed="true"] { background:var(--green); color:white; border-color:var(--green); }
+.life-intro { margin:8px 0 24px; }
+.life-intro h2 { font-size:clamp(1.6rem,4vw,2.3rem); margin:0 0 8px; }
+.life-intro p { color:var(--muted); max-width:65ch; line-height:1.6; }
+.life-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; margin-bottom:20px; }
+.life-card { padding:22px; min-width:0; }
+.life-card h3 { margin:0 0 10px; }
+.life-card > p { color:var(--muted); line-height:1.5; }
+.life-card summary { cursor:pointer; font-size:1.12rem; font-weight:750; padding:4px 0 14px; }
+.life-form { display:grid; gap:12px; }
+.life-form label { display:grid; gap:6px; color:var(--ink); font-size:.9rem; font-weight:650; }
+.life-form input,.life-form select,.life-form textarea { width:100%; min-width:0; padding:10px; border:1px solid #9aacaa; border-radius:6px; background:#fff; color:var(--ink); }
+.life-form textarea { resize:vertical; min-height:75px; }
+.life-form .life-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.life-form .wide { grid-column:1/-1; }
+.life-form button { min-height:44px; }
+.life-record { border-top:1px solid var(--line); padding:16px 0; overflow-wrap:anywhere; }
+.life-record h4 { margin:0 0 6px; }
+.life-record p { margin:6px 0; white-space:pre-wrap; line-height:1.5; }
+.life-record small { color:var(--muted); }
+.life-record dl { margin:8px 0; display:grid; gap:4px 12px; grid-template-columns:minmax(90px,1fr) 2fr; }
+.life-record dt { color:var(--muted); font-size:.88rem; }
+.life-record dd { margin:0; white-space:pre-wrap; }
+.life-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+.life-actions button { min-height:40px; }
+.life-empty { padding:15px 0; color:var(--muted); line-height:1.5; }
+.life-status { padding:12px 0; color:var(--green); min-height:44px; }
+.life-meter { display:grid; grid-template-columns:90px 1fr 42px; align-items:center; gap:10px; margin:8px 0; font-size:.9rem; }
+.life-meter meter { width:100%; height:18px; }
+.life-sync { margin-top:22px; }
+.life-sync > .panel { padding:20px; }
+button:focus-visible,summary:focus-visible { outline:3px solid var(--blue); outline-offset:3px; }
+@media(max-width:720px) { .life-grid { grid-template-columns:1fr; } .life-card { padding:16px; } .life-nav button { flex:1; padding:12px; } }
+@media(max-width:400px) { .life-form .life-fields { grid-template-columns:1fr; } }
+
     </style>
   </head>
   <body>
@@ -950,7 +988,7 @@ button {
             </div>
             <div class="backup-actions">
               <button id="exportBackup" class="secondary-button" type="button">Download backup</button>
-              <input id="importBackupFile" type="file" accept="application/json,.json" />
+              <input id="importBackupFile" type="file" />
               <button id="importBackup" class="primary-button" type="button">Import backup</button>
               <p class="microcopy">Use this to move your saved app data between phone and computer.</p>
             </div>
@@ -959,6 +997,183 @@ button {
       </section>
     </main>
     <script>
+/* Paused Not Dropped: personal health and care records. No external services. */
+const lifeCollections = ['checkins', 'careWins', 'episodes', 'providers', 'visits', 'medications', 'injections', 'labs'];
+function normalizeWellbeing(raw) {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const result = { ...source, version: 1 };
+  for (const key of lifeCollections) result[key] = Array.isArray(source[key]) ? source[key].filter(r => r && typeof r === 'object' && !Array.isArray(r)).map(r => ({ ...r, id: typeof r.id === 'string' ? r.id : makeId(key) })) : [];
+  return result;
+}
+function hasWellbeing(raw) { return lifeCollections.some(k => raw?.wellbeing?.[k]?.length); }
+function prepareReplacement(raw) {
+  if (!raw || !Array.isArray(raw.tasks)) throw new Error('No task data found.');
+  const warning=hasWellbeing(model) && !hasWellbeing(raw) ? 'This copy has no health or care records. It will replace the health and care records on this device. ' : 'Replace this device’s data with the selected copy? ';
+  if (!confirm(warning+'A recovery copy of the current data will be kept on this device. Continue?')) return false;
+  localStorage.setItem(storeKey + '-before-replace', JSON.stringify(backupPayload()));
+  return true;
+}
+function lifeDate(date = new Date()) { const d = new Date(date); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function lifeNow() { const d = new Date(); return `${lifeDate(d)}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+const lifeKinds = ['Achievement','Maintenance','Health','Recovery','Connection','Joy','Care'];
+// Field tuples: key, visible label, input type, options (if any).
+const lifeSchemas = {
+  checkins: { title:'Daily check-in', page:'today', help:'What are you working with today? Capacity and progress are separate, personal ratings. Rest and care count.', fields:[['date','Day','date'],['capacity','Capacity (−100 to +100)','capacity'],['progress','Progress (0 to 100)','progress'],['mood','How are you feeling?','text'],['notes','What shaped your day?','textarea']] },
+  careWins: { title:'More ways today counts', page:'today', help:'Recovery, connection and joy deserve a place in your history.', fields:[['date','Day','date'],['category','Kind of progress','select',lifeKinds],['title','What counted?','required'],['notes','A little more context','textarea']] },
+  episodes: { title:'Symptoms & episodes', page:'health', help:'Start an episode, then add timestamped updates as it changes. Only fill in what matters today.', fields:[['kind','Area','select',['Migraine / head','Energy / fatigue','Feet / mobility','Sleep','Mental health','Digestion','Other']],['title','Symptom or episode','required'],['started','Started','datetime-local'],['severity','Severity (0 to 10)','severity'],['symptoms','Symptoms / location / sensation','textarea'],['context','What was happening? Food, sleep, medication, possible triggers','textarea'],['intervention','What helped or what did you try?','textarea'],['impact','Effect on your day','textarea']] },
+  medications: { title:'Medications & supplies', page:'health', help:'Keep your prescribed instructions, supply and refill plans together.', fields:[['name','Medication / supplement','required'],['dose','Prescribed dose & units','text'],['schedule','Schedule','text'],['supply','Supply remaining (include units)','text'],['refill','Refill reminder date','optional-date'],['notes','Notes','textarea']] },
+  injections: { title:'Testosterone / injection log', page:'health', help:'Record what you took and the next date in your existing care plan.', fields:[['date','Injection date','date'],['dose','Dose & units','required'],['site','Injection site','text'],['next','Next planned injection','optional-date'],['notes','Notes / response','textarea']] },
+  labs: { title:'Labs & long-term health', page:'health', help:'Keep actual results and units over time. Your clinician’s reference range belongs with each result.', fields:[['date','Sample date','date'],['name','Test (for example ALT or testosterone)','required'],['result','Result','required'],['units','Units','text'],['range','Lab reference range','text'],['providerId','Provider','provider'],['notes','Notes / follow-up','textarea']] },
+  providers: { title:'Your care team', page:'care', help:'The people supporting your health, and what you see them for.', fields:[['name','Provider / clinic','required'],['specialty','Specialty','text'],['reason','What I see them for','textarea'],['contact','Contact details','text'],['questions','Questions for next visit','textarea']] },
+  visits: { title:'Visits & follow-ups', page:'care', help:'Prepare questions before a visit, then keep notes, orders and next steps in one place.', fields:[['providerId','Provider','provider'],['title','Visit / appointment','required'],['when','Appointment date & time','datetime-local'],['status','Status','select',['Planned','Completed','Cancelled']],['questions','Questions to bring','textarea'],['notes','Visit notes / treatment','textarea'],['orders','Labs, orders & follow-ups','textarea'],['next','Next follow-up date','optional-date']] }
+};
+let lifeEditing = {};
+function lifeField(field, key) {
+  const [name,label,type,options] = field;
+  const id = `life-${key}-${name}`;
+  let input;
+  if (type === 'textarea') input = `<textarea id="${id}" name="${name}" maxlength="4000"></textarea>`;
+  else if (type === 'provider' || type === 'select') input = `<select id="${id}" name="${name}">${type === 'provider' ? '<option value="">Not linked yet</option>' : options.map(v=>`<option>${escapeHtml(v)}</option>`).join('')}</select>`;
+  else {
+    const number = ['capacity','progress','severity'].includes(type);
+    const htmlType = number ? 'number' : type === 'required' ? 'text' : type === 'optional-date' ? 'date' : type;
+    input = `<input id="${id}" name="${name}" type="${htmlType}" ${['required','date','datetime-local','capacity','progress'].includes(type) ? 'required' : ''} ${number ? `step="1" min="${type==='capacity'?-100:0}" max="${type==='severity'?10:100}"` : 'maxlength="250"'} />`;
+  }
+  return `<label class="${type==='textarea'?'wide':''}" for="${id}">${label}${input}</label>`;
+}
+function initWellbeing() {
+  const main = document.querySelector('main');
+  const hero = main.querySelector('.hero-panel');
+  const today = document.createElement('div'); today.id = 'life-page-today';
+  while (hero.nextElementSibling) today.append(hero.nextElementSibling);
+  main.append(today);
+  hero.insertAdjacentHTML('afterend','<nav class="life-nav" aria-label="App sections"><button type="button" data-life-page="today" aria-pressed="true">Today</button><button type="button" data-life-page="health" aria-pressed="false">Health</button><button type="button" data-life-page="care" aria-pressed="false">Care Team</button></nav><div id="life-status" class="life-status" role="status" aria-live="polite"></div>');
+  today.insertAdjacentHTML('afterbegin','<div id="life-today-grid" class="life-grid"></div>');
+  for (const [page,title,help] of [['health','How’s the meat suit?','A little context for the days you’re living. Log what matters; leave the rest.'],['care','Your care, connected','Questions, appointments and next steps, ready when you need them.']]) {
+    main.insertAdjacentHTML('beforeend',`<section id="life-page-${page}" hidden><div class="life-intro"><h2>${title}</h2><p>${help}</p></div><div id="life-${page}-grid" class="life-grid"></div></section>`);
+  }
+  for (const [key,schema] of Object.entries(lifeSchemas)) {
+    document.querySelector(`#life-${schema.page}-grid`).insertAdjacentHTML('beforeend',`<section class="panel life-card"><details ${key==='checkins'||key==='episodes'||key==='providers'?'open':''}><summary>${schema.title}</summary><p>${schema.help}</p><form class="life-form" data-life-form="${key}"><div class="life-fields">${schema.fields.map(f=>lifeField(f,key)).join('')}</div><div class="life-actions"><button type="submit" class="primary-button">Save entry</button><button type="button" class="ghost-button" data-life-cancel="${key}" hidden>Cancel edit</button></div></form></details><div data-life-list="${key}"></div></section>`);
+    resetLifeForm(key);
+  }
+  const shared = document.createElement('div'); shared.className = 'life-sync life-grid';
+  for (const heading of today.querySelectorAll('h2')) if (['Sync','Backup'].includes(heading.textContent.trim())) shared.append(heading.closest('.panel'));
+  main.append(shared);
+  const syncPanel = shared.querySelector('.panel');
+  syncPanel.insertAdjacentHTML('beforeend','<p id="syncStatus" role="status" aria-live="polite"></p>');
+  shared.insertAdjacentHTML('beforeend','<p class="microcopy">Health and care entries are included in your backup and manual Sheet sync. Open the updated app on both devices before syncing. Save here, then load on the other device.</p>');
+  const restore = document.createElement('button'); restore.type='button'; restore.className='ghost-button'; restore.textContent='Download pre-load recovery copy';
+  restore.onclick = () => { const raw=localStorage.getItem(storeKey+'-before-replace'); if(!raw) return lifeMessage('No replacement recovery copy yet.'); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([raw],{type:'application/json'})); a.download='paused-not-dropped-recovery.json'; a.click(); URL.revokeObjectURL(a.href); };
+  shared.append(restore);
+  main.addEventListener('submit',lifeSubmit);
+  main.addEventListener('click',lifeClick);
+  renderWellbeing();
+}
+function resetLifeForm(key) {
+  const form=document.querySelector(`[data-life-form="${key}"]`); if(!form) return;
+  form.reset(); delete lifeEditing[key];
+  for(const [name,,type] of lifeSchemas[key].fields) {
+    if(type==='date') form.elements[name].value=lifeDate();
+    if(type==='datetime-local') form.elements[name].value=lifeNow();
+  }
+  form.querySelector('[type="submit"]').textContent='Save entry';
+  form.querySelector('[data-life-cancel]').hidden=true;
+}
+function lifeMessage(message) { document.querySelector('#life-status').textContent=message; }
+function lifeSubmit(event) {
+  const form=event.target; const key=form.dataset.lifeForm;
+  if(!key && !form.dataset.episodeUpdate) return;
+  event.preventDefault();
+  const values=Object.fromEntries(new FormData(form));
+  for(const name of Object.keys(values)) values[name]=values[name].trim();
+  if(key && lifeSchemas[key].fields.some(([name,,type])=>type==='required'&&!values[name])) return lifeMessage('Please fill in the required description.');
+  const prior=structuredClone(model.wellbeing); const now=new Date().toISOString();
+  if(form.dataset.episodeUpdate) {
+    const episode=model.wellbeing.episodes.find(e=>e.id===form.dataset.episodeUpdate); if(!episode) return;
+    if(!values.note && values.severity==='') return lifeMessage('Add a severity or a note for this update.');
+    if(values.severity!=='') episode.severity=Number(values.severity);
+    episode.updates=[...(episode.updates||[]),{id:makeId('update'),at:now,...values}]; episode.updatedAt=now;
+  } else {
+    for(const [name,,type] of lifeSchemas[key].fields) if(['capacity','progress','severity'].includes(type) && values[name]!=='') values[name]=Number(values[name]);
+    const records=model.wellbeing[key];
+    const index=records.findIndex(r=>r.id===lifeEditing[key]);
+    const old=index>=0?records[index]:{};
+    const record={...old,...values,id:old.id||makeId(key),createdAt:old.createdAt||now,updatedAt:now};
+    if(index>=0) records[index]=record; else records.push(record);
+  }
+  try { saveModel(); } catch { model.wellbeing=prior; return lifeMessage('Could not save on this device. Your form is still here; download a backup and free some storage.'); }
+  if(key) resetLifeForm(key); else form.reset();
+  renderWellbeing(); lifeMessage('Saved on this device. Use Save to Sheet to send it to your other device.');
+}
+function lifeClick(event) {
+  const button=event.target.closest('button'); if(!button) return;
+  if(button.dataset.lifePage) {
+    const page=button.dataset.lifePage;
+    for(const p of ['today','health','care']) document.querySelector(`#life-page-${p}`).hidden=p!==page;
+    for(const b of document.querySelectorAll('[data-life-page]')) b.setAttribute('aria-pressed',String(b===button));
+    document.querySelector('.hero-panel h1').textContent={today:'What can I do next?',health:'How am I doing?',care:'What do I want to bring up?'}[page];
+    document.querySelector('.hero-panel .lede').textContent={today:'Pick by energy, state, goal, or let the wheel break the decision freeze.',health:'Notice symptoms, care and recovery over time, at your own pace.',care:'Keep your providers, questions and follow-ups together.'}[page];
+  }
+  if(button.dataset.lifeCancel) resetLifeForm(button.dataset.lifeCancel);
+  const key=button.dataset.lifeKey, id=button.dataset.lifeId;
+  if(!key||!id) return;
+  const record=model.wellbeing[key].find(r=>r.id===id); if(!record) return;
+  if(button.dataset.lifeAction==='edit') {
+    const form=document.querySelector(`[data-life-form="${key}"]`);
+    for(const [name] of lifeSchemas[key].fields) form.elements[name].value=record[name]??'';
+    lifeEditing[key]=id; form.closest('details').open=true;
+    form.querySelector('[type="submit"]').textContent='Save changes'; form.querySelector('[data-life-cancel]').hidden=false;
+    form.scrollIntoView({behavior:'smooth',block:'center'}); form.querySelector('input,select,textarea').focus();
+  }
+  if(button.dataset.lifeAction==='archive') {
+    const before=structuredClone(model.wellbeing);
+    record.archived=!record.archived;
+    try { saveModel(); } catch { model.wellbeing=before; return lifeMessage('Could not save this change.'); }
+    if(lifeEditing[key]===id) resetLifeForm(key);
+    renderWellbeing(); lifeMessage(record.archived?'Entry archived. You can restore it below.':'Entry restored.');
+  }
+  if(button.dataset.lifeAction==='resolve') {
+    const before=structuredClone(model.wellbeing);
+    record.resolvedAt=record.resolvedAt?'':new Date().toISOString(); record.updatedAt=new Date().toISOString();
+    try { saveModel(); } catch { model.wellbeing=before; return lifeMessage('Could not save the episode status.'); }
+    renderWellbeing(); lifeMessage(record.resolvedAt?'Episode marked resolved.':'Episode reopened.');
+  }
+}
+function lifeProvider(id) { return model.wellbeing.providers.find(p=>p.id===id)?.name||'Unlinked provider'; }
+function lifeDetails(record,key) {
+  return '<dl>'+lifeSchemas[key].fields.filter(([name])=>!['title','name','date','when','capacity','progress'].includes(name)&&record[name]!==''&&record[name]!=null).map(([name,label])=>`<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(name==='providerId'?lifeProvider(record[name]):record[name])}</dd>`).join('')+'</dl>';
+}
+function renderWellbeing() {
+  if(!document.querySelector('#life-today-grid')) return;
+  const data=model.wellbeing;
+  for(const select of document.querySelectorAll('.life-form select[name="providerId"]')) {
+    const value=select.value;
+    select.innerHTML='<option value="">Not linked yet</option>'+data.providers.map(p=>`<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`).join(''); select.value=value;
+  }
+  for(const key of lifeCollections) {
+    const list=document.querySelector(`[data-life-list="${key}"]`);
+    const records=[...data[key]].sort((a,b)=>String(b.date||b.when||b.started||b.createdAt||'').localeCompare(String(a.date||a.when||a.started||a.createdAt||'')));
+    const renderRecord=record=>{
+      const title=record.title||record.name|| (key==='checkins'?'Daily check-in':key==='injections'?'Injection':record.category);
+      const date=record.date||record.when||record.started;
+      const action=`data-life-key="${key}" data-life-id="${escapeHtml(record.id)}"`;
+      let extra='';
+      if(key==='checkins') extra=`<div class="life-meter"><span>Capacity</span><meter min="-100" max="100" value="${Number(record.capacity)||0}"></meter><strong>${Number(record.capacity)||0}</strong></div><div class="life-meter"><span>Progress</span><meter min="0" max="100" value="${Number(record.progress)||0}"></meter><strong>${Number(record.progress)||0}</strong></div>`;
+      if(key==='episodes') {
+        extra+=`<p><strong>${record.resolvedAt?'Resolved '+escapeHtml(formatTime(record.resolvedAt)):'Ongoing'}</strong></p><details><summary>Updates (${record.updates?.length||0})</summary>${(record.updates||[]).map(u=>`<p><small>${escapeHtml(formatTime(u.at))}</small><br>${u.severity!==''&&u.severity!=null?'Severity '+escapeHtml(u.severity)+'/10 · ':''}${escapeHtml(u.note||'')}</p>`).join('')}${!record.resolvedAt?`<form class="life-form" data-episode-update="${escapeHtml(record.id)}"><label>New severity (optional)<input name="severity" type="number" min="0" max="10" step="1"></label><label>What changed or helped?<textarea name="note" maxlength="4000"></textarea></label><button type="submit" class="secondary-button">Add timestamped update</button></form>`:''}</details>`;
+      }
+      if(key==='visits'&&record.providerId) {
+        const p=data.providers.find(p=>p.id===record.providerId);
+        if(p?.questions) extra+=`<p><strong>From your provider question list</strong><br>${escapeHtml(p.questions)}</p>`;
+      }
+      return `<article class="life-record"><h4>${escapeHtml(title||'Entry')}</h4>${date?`<small>${escapeHtml(String(date).replace('T',' · '))}</small>`:''}${extra}${lifeDetails(record,key)}<div class="life-actions"><button class="ghost-button" type="button" ${action} data-life-action="edit">Edit</button>${key==='episodes'?`<button class="secondary-button" type="button" ${action} data-life-action="resolve">${record.resolvedAt?'Reopen':'Mark resolved'}</button>`:''}<button class="ghost-button" type="button" ${action} data-life-action="archive">${record.archived?'Restore':'Archive'}</button></div></article>`;
+    };
+    const active=records.filter(r=>!r.archived), archived=records.filter(r=>r.archived);
+    list.innerHTML=(active.length?active.map(renderRecord).join(''):'<p class="life-empty">No entries yet. Start whenever it’s useful to you.</p>')+(archived.length?`<details><summary>Archived (${archived.length})</summary>${archived.map(renderRecord).join('')}</details>`:'');
+  }
+}
+
+
 const goals = [
   {
     id: "career",
@@ -1177,8 +1392,12 @@ function loadModel() {
 }
 
 function normalizeModel(raw) {
-  const tasks = Array.isArray(raw.tasks) && raw.tasks.length ? raw.tasks : starterTasks;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Invalid app data");
+  const tasks = Array.isArray(raw.tasks) ? raw.tasks : starterTasks;
   return {
+    ...raw,
+    schemaVersion: 2,
+    wellbeing: normalizeWellbeing(raw.wellbeing),
     tasks: tasks.map((task) => ({
       ...task,
       state: task.state === "Done" ? "Completed" : task.state,
@@ -1555,6 +1774,7 @@ function renderAll() {
   renderGoals();
   renderTasks();
   renderToday();
+  renderWellbeing();
 }
 
 function escapeHtml(value) {
@@ -1674,7 +1894,7 @@ function restoreTodayProgress() {
 function backupPayload() {
   return {
     app: "Paused Not Dropped",
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     model: normalizeModel(model),
   };
@@ -1708,6 +1928,7 @@ function importBackup() {
       const parsed = JSON.parse(String(reader.result || ""));
       const nextModel = parsed.model || parsed;
       if (!nextModel || !Array.isArray(nextModel.tasks)) throw new Error("No task data found.");
+      if (!prepareReplacement(nextModel)) return;
       model = normalizeModel(nextModel);
       saveModel();
       renderAll();
@@ -1735,7 +1956,7 @@ function saveSyncSettings() {
     key: document.querySelector("#syncKey").value.trim(),
   };
   localStorage.setItem(syncSettingsKey, JSON.stringify(settings));
-  document.querySelector("#spinResult").textContent = "Sync settings saved.";
+  document.querySelector("#syncStatus").textContent = "Sync settings saved.";
 }
 
 function populateSyncSettings() {
@@ -1750,29 +1971,37 @@ function syncSettingsOrMessage() {
     key: document.querySelector("#syncKey").value.trim(),
   };
   if (!settings.url || !settings.key) {
-    document.querySelector("#spinResult").textContent = "Add the Web App URL and sync key first.";
+    document.querySelector("#syncStatus").textContent = "Add the Web App URL and sync key first.";
     return null;
   }
   localStorage.setItem(syncSettingsKey, JSON.stringify(settings));
   return settings;
 }
 
-function saveToSheet() {
+async function saveToSheet() {
   const settings = syncSettingsOrMessage();
   if (!settings) return;
 
   const form = new FormData();
   form.append("action", "save");
   form.append("key", settings.key);
-  form.append("payload", JSON.stringify(backupPayload()));
+  const payload = JSON.stringify(backupPayload());
+  if (payload.length > 45000) {
+    document.querySelector("#syncStatus").textContent = "This backup is approaching the current Sheet storage limit. Download a backup; Sheet sync needs a storage upgrade before saving more history.";
+    return;
+  }
+  form.append("payload", payload);
 
-  fetch(settings.url, {
+  try { await fetch(settings.url, {
     method: "POST",
     mode: "no-cors",
     body: form,
-  });
+  }); } catch {
+    document.querySelector("#syncStatus").textContent = "Could not send to Google Sheet. Your data is still saved on this device.";
+    return;
+  }
 
-  document.querySelector("#spinResult").textContent = "Save sent to Google Sheet. Load from Sheet on another device after a moment.";
+  document.querySelector("#syncStatus").textContent = "Save request sent. This connection cannot confirm receipt; verify the Sheet before loading on another device.";
 }
 
 function loadFromSheet() {
@@ -1785,12 +2014,13 @@ function loadFromSheet() {
   window[callbackName] = (response) => {
     try {
       if (!response || response.ok === false) throw new Error(response?.error || "Sync failed.");
+      if (!prepareReplacement(response.model)) return;
       model = normalizeModel(response.model);
       saveModel();
       renderAll();
-      document.querySelector("#spinResult").textContent = "Loaded from Google Sheet.";
+      document.querySelector("#syncStatus").textContent = "Loaded from Google Sheet.";
     } catch (error) {
-      document.querySelector("#spinResult").textContent = "Could not load from Google Sheet.";
+      document.querySelector("#syncStatus").textContent = "Could not load from Google Sheet.";
     } finally {
       delete window[callbackName];
       script.remove();
@@ -1804,7 +2034,7 @@ function loadFromSheet() {
   script.onerror = () => {
     delete window[callbackName];
     script.remove();
-    document.querySelector("#spinResult").textContent = "Could not reach the Google Sheet sync.";
+    document.querySelector("#syncStatus").textContent = "Could not reach the Google Sheet sync.";
   };
   script.src = url.toString();
   document.body.appendChild(script);
@@ -1971,8 +2201,8 @@ setupCollapsibleSections();
 populateSyncSettings();
 bindEvents();
 renderAll();
+initWellbeing();
 
     </script>
   </body>
 </html>
-
