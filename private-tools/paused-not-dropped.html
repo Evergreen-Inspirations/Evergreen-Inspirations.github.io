@@ -784,6 +784,12 @@ button {
 .life-sync { margin-top:22px; }
 .life-sync > .panel { padding:20px; }
 button:focus-visible,summary:focus-visible { outline:3px solid var(--blue); outline-offset:3px; }
+.task-status-label { display:grid; gap:6px; margin-top:12px; font-size:.85rem; font-weight:700; }
+.task-status-select { width:100%; max-width:300px; min-height:44px; padding:8px 12px; border:1px solid #9aacaa; border-radius:6px; background:white; color:var(--ink); }
+.goal-today { display:inline-block; font-size:.72rem; border-radius:999px; padding:3px 8px; background:#e0f2e9; color:#215d4c; }
+.goal-completion { display:grid; gap:5px; font-size:.8rem; margin:10px 0; }
+.goal-completion progress { width:100%; accent-color:var(--green); }
+.goal-status-breakdown { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
 @media(max-width:720px) { .life-grid { grid-template-columns:1fr; } .life-card { padding:16px; } .life-nav button { flex:1; padding:12px; } }
 @media(max-width:400px) { .life-form .life-fields { grid-template-columns:1fr; } }
 
@@ -1016,9 +1022,34 @@ function prepareReplacement(raw) {
 function lifeDate(date = new Date()) { const d = new Date(date); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function lifeNow() { const d = new Date(); return `${lifeDate(d)}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
 const lifeKinds = ['Achievement','Maintenance','Health','Recovery','Connection','Joy','Care'];
+const lifeCapacityLevels = [
+  [-100,'I went to the ER'],
+  [-90,'I needed urgent help to get through the day'],
+  [-80,'I needed help with basic needs'],
+  [-70,'I spent most of the day in bed or resting'],
+  [-60,'I could manage only the essentials'],
+  [-50,'I had about half my usual capacity'],
+  [-40,'I needed frequent breaks and a much lighter day'],
+  [-30,'I had to slow down and scale back'],
+  [-20,'I felt limited but could do some usual activities'],
+  [-10,'I was a little below my usual capacity'],
+  [0,'I felt at my usual baseline'],
+  [10,'I had a little extra energy'],
+  [20,'I felt steady and ready for a bit more'],
+  [30,'I had enough energy for a few meaningful things'],
+  [40,'I felt capable through a good part of the day'],
+  [50,'I had a solid day with energy for my priorities'],
+  [60,'I had energy for priorities and some extras'],
+  [70,'I could do most of what I hoped to do'],
+  [80,'I felt strong and able through most of the day'],
+  [90,'I did almost everything I wanted to do today'],
+  [100,'I did everything I wanted to do today']
+];
+function capacityLabel(value) { return lifeCapacityLevels.find(([score])=>score===Number(value))?.[1] || 'Earlier capacity rating'; }
+function signedCapacity(value) { return Number(value)>0?'+'+Number(value):String(Number(value)); }
 // Field tuples: key, visible label, input type, options (if any).
 const lifeSchemas = {
-  checkins: { title:'Daily check-in', page:'today', help:'What are you working with today? Capacity and progress are separate, personal ratings. Rest and care count.', fields:[['date','Day','date'],['capacity','Capacity (−100 to +100)','capacity'],['progress','Progress (0 to 100)','progress'],['mood','How are you feeling?','text'],['notes','What shaped your day?','textarea']] },
+  checkins: { title:'Daily check-in', page:'today', help:'Choose the description that fits your day best. Capacity is your personal experience; goal progress comes from task statuses below.', fields:[['date','Day','date'],['capacity','Capacity — how was your day?','capacity'],['mood','How are you feeling?','text'],['notes','What shaped your day?','textarea']] },
   careWins: { title:'More ways today counts', page:'today', help:'Recovery, connection and joy deserve a place in your history.', fields:[['date','Day','date'],['category','Kind of progress','select',lifeKinds],['title','What counted?','required'],['notes','A little more context','textarea']] },
   episodes: { title:'Symptoms & episodes', page:'health', help:'Start an episode, then add timestamped updates as it changes. Only fill in what matters today.', fields:[['kind','Area','select',['Migraine / head','Energy / fatigue','Feet / mobility','Sleep','Mental health','Digestion','Other']],['title','Symptom or episode','required'],['started','Started','datetime-local'],['severity','Severity (0 to 10)','severity'],['symptoms','Symptoms / location / sensation','textarea'],['context','What was happening? Food, sleep, medication, possible triggers','textarea'],['intervention','What helped or what did you try?','textarea'],['impact','Effect on your day','textarea']] },
   medications: { title:'Medications & supplies', page:'health', help:'Keep your prescribed instructions, supply and refill plans together.', fields:[['name','Medication / supplement','required'],['dose','Prescribed dose & units','text'],['schedule','Schedule','text'],['supply','Supply remaining (include units)','text'],['refill','Refill reminder date','optional-date'],['notes','Notes','textarea']] },
@@ -1032,14 +1063,15 @@ function lifeField(field, key) {
   const [name,label,type,options] = field;
   const id = `life-${key}-${name}`;
   let input;
-  if (type === 'textarea') input = `<textarea id="${id}" name="${name}" maxlength="4000"></textarea>`;
+  if (type === 'capacity') input = `<select id="${id}" name="${name}" required><option value="">Choose a capacity level</option>${lifeCapacityLevels.map(([value,text])=>`<option value="${value}">${signedCapacity(value)} · ${escapeHtml(text)}</option>`).join('')}</select>`;
+  else if (type === 'textarea') input = `<textarea id="${id}" name="${name}" maxlength="4000"></textarea>`;
   else if (type === 'provider' || type === 'select') input = `<select id="${id}" name="${name}">${type === 'provider' ? '<option value="">Not linked yet</option>' : options.map(v=>`<option>${escapeHtml(v)}</option>`).join('')}</select>`;
   else {
     const number = ['capacity','progress','severity'].includes(type);
     const htmlType = number ? 'number' : type === 'required' ? 'text' : type === 'optional-date' ? 'date' : type;
     input = `<input id="${id}" name="${name}" type="${htmlType}" ${['required','date','datetime-local','capacity','progress'].includes(type) ? 'required' : ''} ${number ? `step="1" min="${type==='capacity'?-100:0}" max="${type==='severity'?10:100}"` : 'maxlength="250"'} />`;
   }
-  return `<label class="${type==='textarea'?'wide':''}" for="${id}">${label}${input}</label>`;
+  return `<label class="${['textarea','capacity'].includes(type)?'wide':''}" for="${id}">${label}${input}</label>`;
 }
 function initWellbeing() {
   const main = document.querySelector('main');
@@ -1067,6 +1099,11 @@ function initWellbeing() {
   shared.append(restore);
   main.addEventListener('submit',lifeSubmit);
   main.addEventListener('click',lifeClick);
+  document.querySelector('#taskList').addEventListener('change',event=>{
+    if(!event.target.matches('.task-status-select')) return;
+    const card=event.target.closest('[data-task-id]');
+    if(card) setTaskStatus(card.dataset.taskId,event.target.value);
+  });
   renderWellbeing();
 }
 function resetLifeForm(key) {
@@ -1120,7 +1157,11 @@ function lifeClick(event) {
   const record=model.wellbeing[key].find(r=>r.id===id); if(!record) return;
   if(button.dataset.lifeAction==='edit') {
     const form=document.querySelector(`[data-life-form="${key}"]`);
-    for(const [name] of lifeSchemas[key].fields) form.elements[name].value=record[name]??'';
+    for(const [name,,type] of lifeSchemas[key].fields) {
+      const field=form.elements[name];
+      if(type==='capacity' && record[name]!=null && !Array.from(field.options).some(option=>option.value===String(record[name]))) field.add(new Option(`${signedCapacity(record[name])} · Earlier capacity rating`,record[name]));
+      field.value=record[name]??'';
+    }
     lifeEditing[key]=id; form.closest('details').open=true;
     form.querySelector('[type="submit"]').textContent='Save changes'; form.querySelector('[data-life-cancel]').hidden=false;
     form.scrollIntoView({behavior:'smooth',block:'center'}); form.querySelector('input,select,textarea').focus();
@@ -1158,7 +1199,7 @@ function renderWellbeing() {
       const date=record.date||record.when||record.started;
       const action=`data-life-key="${key}" data-life-id="${escapeHtml(record.id)}"`;
       let extra='';
-      if(key==='checkins') extra=`<div class="life-meter"><span>Capacity</span><meter min="-100" max="100" value="${Number(record.capacity)||0}"></meter><strong>${Number(record.capacity)||0}</strong></div><div class="life-meter"><span>Progress</span><meter min="0" max="100" value="${Number(record.progress)||0}"></meter><strong>${Number(record.progress)||0}</strong></div>`;
+      if(key==='checkins') extra=`<div class="life-meter"><span>Capacity</span><meter aria-label="Capacity" min="-100" max="100" value="${Number(record.capacity)||0}"></meter><strong>${signedCapacity(record.capacity)}</strong></div><p>${escapeHtml(capacityLabel(record.capacity))}</p>`;
       if(key==='episodes') {
         extra+=`<p><strong>${record.resolvedAt?'Resolved '+escapeHtml(formatTime(record.resolvedAt)):'Ongoing'}</strong></p><details><summary>Updates (${record.updates?.length||0})</summary>${(record.updates||[]).map(u=>`<p><small>${escapeHtml(formatTime(u.at))}</small><br>${u.severity!==''&&u.severity!=null?'Severity '+escapeHtml(u.severity)+'/10 · ':''}${escapeHtml(u.note||'')}</p>`).join('')}${!record.resolvedAt?`<form class="life-form" data-episode-update="${escapeHtml(record.id)}"><label>New severity (optional)<input name="severity" type="number" min="0" max="10" step="1"></label><label>What changed or helped?<textarea name="note" maxlength="4000"></textarea></label><button type="submit" class="secondary-button">Add timestamped update</button></form>`:''}</details>`;
       }
@@ -1171,6 +1212,35 @@ function renderWellbeing() {
     const active=records.filter(r=>!r.archived), archived=records.filter(r=>r.archived);
     list.innerHTML=(active.length?active.map(renderRecord).join(''):'<p class="life-empty">No entries yet. Start whenever it’s useful to you.</p>')+(archived.length?`<details><summary>Archived (${archived.length})</summary>${archived.map(renderRecord).join('')}</details>`:'');
   }
+}
+
+function todayEntries(now=new Date()) {
+  const day=lifeDate(now);
+  return model.today.filter(item=>item.at && !Number.isNaN(new Date(item.at).getTime()) && lifeDate(item.at)===day);
+}
+function goalProgress(goalId) {
+  const tasks=model.tasks.filter(task=>taskGoalIds(task).includes(goalId));
+  const counts=Object.fromEntries(states.map(state=>[state,0]));
+  for(const task of tasks) counts[task.state]=(counts[task.state]||0)+1;
+  const total=tasks.length-(counts['Dropped On Purpose']||0);
+  const completed=counts.Completed||0;
+  return {counts,total,completed,percent:total?Math.round(completed/total*100):null};
+}
+function renderGoalProgress() {
+  const touched=new Set(todayEntries().flatMap(item=>normalizeGoals(item.goalIds||item.goal)));
+  document.querySelector('#goalList').innerHTML='<p class="microcopy">Progress is based on current task statuses across all dates. Completed tasks count toward the percentage; tasks dropped on purpose are excluded. Each task counts equally within each linked goal.</p>'+goals.map(goal=>{
+    const progress=goalProgress(goal.id);
+    return `<div class="goal-item"><strong>${escapeHtml(goal.name)} ${touched.has(goal.id)?'<span class="goal-today">Touched today</span>':''}</strong><small>${escapeHtml(goal.counts)}</small>${progress.total?`<div class="goal-completion"><progress aria-label="${escapeHtml(goal.name)} completed tasks" max="${progress.total}" value="${progress.completed}"></progress><span>${progress.completed} / ${progress.total} completed · ${progress.percent}%</span></div>`:'<small>No active or completed tasks yet.</small>'}<div class="goal-status-breakdown">${Object.entries(progress.counts).filter(([,count])=>count>0).map(([status,count])=>`<span class="tag">${escapeHtml(status)}: ${count}</span>`).join('')}</div></div>`;
+  }).join('');
+}
+function setTaskStatus(id,state) {
+  const task=model.tasks.find(item=>item.id===id);
+  if(!task || !states.includes(state) || task.state===state) return;
+  task.goalIds=taskGoalIds(task);
+  task.state=state; task.updatedAt=new Date().toISOString();
+  recordActivity(task.title,state,task.goalIds);
+  if(['Started','Made Progress','Completed','Paused'].includes(state)) model.today.push({id:makeId('win'),text:`${state}: ${task.title}`,goal:task.goalIds[0],goalIds:task.goalIds,at:task.updatedAt});
+  saveModel(); renderAll();
 }
 
 
@@ -1597,20 +1667,7 @@ function renderGoalMix(open, complete) {
     .join("");
 }
 
-function renderGoals() {
-  const touched = new Set(model.today.flatMap((item) => normalizeGoals(item.goalIds || item.goal)));
-  document.querySelector("#goalList").innerHTML = goals
-    .map((goal) => {
-      const active = touched.has(goal.id);
-      return `
-        <div class="goal-item">
-          <strong>${active ? "Today: " : ""}${goal.name}</strong>
-          <small>${goal.counts}</small>
-        </div>
-      `;
-    })
-    .join("");
-}
+function renderGoals() { renderGoalProgress(); }
 
 function renderTasks() {
   const list = document.querySelector("#taskList");
@@ -1670,13 +1727,11 @@ function taskCard(task, isMatch, isCompleted = false) {
           <span class="tag">${task.mode}</span>
           ${isMatch ? `<span class="tag">matches filters</span>` : ""}
         </div>
-        <div class="state-row" aria-label="Task state">
-          ${states
-            .map(
-              (state) => `<button class="state-button ${task.state === state ? "active" : ""}" data-state="${state}">${state}</button>`,
-            )
-            .join("")}
-        </div>
+        <label class="task-status-label">Task status
+          <select class="task-status-select" aria-label="Status for ${escapeHtml(task.title)}">
+            ${states.map(state => `<option value="${escapeHtml(state)}" ${task.state === state ? 'selected' : ''}>${escapeHtml(state)}</option>`).join('')}
+          </select>
+        </label>
       </div>
       <div class="card-actions">
         <button class="edit-button" title="Edit option" data-edit="${task.id}">Edit</button>
@@ -1706,15 +1761,16 @@ function renderWheel(matches) {
 }
 
 function renderToday() {
+  const entries = todayEntries();
   const log = document.querySelector("#todayLog");
-  const touched = new Set(model.today.flatMap((item) => normalizeGoals(item.goalIds || item.goal)));
+  const touched = new Set(todayEntries().flatMap((item) => normalizeGoals(item.goalIds || item.goal)));
   document.querySelector("#todayCount").textContent = `${touched.size} goal${touched.size === 1 ? "" : "s"}`;
   document.querySelector("#todayNote").textContent = touched.size
     ? [...touched].map(goalName).join(" · ")
     : "Log a win or mark a task to start the receipt trail.";
 
-  log.innerHTML = model.today.length
-    ? model.today
+  log.innerHTML = entries.length
+    ? entries
         .slice()
         .reverse()
         .map(
