@@ -405,6 +405,74 @@ button {
   min-height: 0;
 }
 
+.goal-dropdown {
+  position: relative;
+  min-width: 0;
+}
+
+.goal-dropdown summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+  list-style: none;
+}
+
+.goal-dropdown summary::-webkit-details-marker { display: none; }
+.goal-dropdown summary::after {
+  content: "▾";
+  margin-left: auto;
+  color: var(--muted);
+}
+.goal-dropdown[open] summary::after { content: "▴"; }
+
+.goal-dropdown .goal-choice-grid {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  grid-template-columns: 1fr;
+  max-height: none;
+  overflow: visible;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(19, 45, 41, 0.16);
+}
+
+.quick-links {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.quick-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 54px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 850;
+  text-align: center;
+  text-decoration: none;
+}
+.quick-link:hover { background: #f4f8f6; }
+
+.top-progress-panel, .quick-links-panel { margin-bottom: 18px; }
+
 .hidden {
   display: none;
 }
@@ -705,6 +773,10 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .quick-links {
+    grid-template-columns: 1fr;
+  }
+
   .today-card {
     min-width: 0;
   }
@@ -766,6 +838,25 @@ button {
           <span>Today touched</span>
           <strong id="todayCount">0 goals</strong>
           <small id="todayNote">Log a win or mark a task to start the receipt trail.</small>
+          <button id="resetTodayTouched" class="ghost-button" type="button">Reset today</button>
+        </div>
+      </section>
+
+      <section class="panel top-progress-panel">
+        <div class="panel-heading">
+          <h2>Goal Progress</h2>
+          <span class="pill">open + completed</span>
+        </div>
+        <p class="microcopy">Goal bars show open in green and completed/released in navy, with the percentage completed at right.</p>
+        <div id="goalMix" class="goal-mix"></div>
+      </section>
+
+      <section class="panel quick-links-panel">
+        <div class="panel-heading"><h2>Quick Links</h2></div>
+        <div class="quick-links">
+          <a class="quick-link" href="https://docs.google.com/spreadsheets/d/1aqSINC3FQsYhdRSD7E1rc3a4Vazzjw7t8xQTgcY0qp0/edit?usp=drivesdk" target="_blank" rel="noopener">🍂 Fall 2026 Quarter Tracker</a>
+          <a class="quick-link" href="https://docs.google.com/spreadsheets/d/1DsZL0ok5qHqDvCxgMgZ8Y2TtrfRq9GnZ-mK_eohrn_w/edit?usp=drivesdk" target="_blank" rel="noopener">🛠️ Internship Hours Tracker</a>
+          <a class="quick-link" href="https://docs.google.com/spreadsheets/d/1swCDb28EXo2FZ1JzSO2E2Ttbijow2Vz6/edit?usp=drivesdk&amp;ouid=112687634876972813262&amp;rtpof=true&amp;sd=true" target="_blank" rel="noopener">🔎 Job Search Tracker</a>
         </div>
       </section>
 
@@ -784,9 +875,7 @@ button {
           <div>
             <h3 class="subhead">Recently Changed</h3>
             <div id="recentChanges" class="snapshot-list"></div>
-            <h3 class="subhead spaced">Goal Mix Across Tasks</h3>
-            <p class="microcopy">Status pills: red = urgent, yellow = paused/waiting/thinking, green = started/made progress, navy = completed/released. Goal bars show open in green and completed/released in navy.</p>
-            <div id="goalMix" class="goal-mix"></div>
+            <p class="microcopy spaced">Status pills: red = urgent, yellow = paused/waiting/thinking, green = started/made progress, navy = completed/released.</p>
           </div>
         </div>
       </section>
@@ -913,10 +1002,10 @@ button {
             </div>
             <form id="winForm" class="win-form">
               <input id="winText" type="text" placeholder="Log a win, thought, or start" required />
-              <fieldset class="goal-picker">
-                <legend>Goals</legend>
+              <details id="winGoalDropdown" class="goal-dropdown">
+                <summary id="winGoalSummary">Choose goals…</summary>
                 <div id="winGoalChoices" class="goal-choice-grid"></div>
-              </fieldset>
+              </details>
               <select id="winStatus"></select>
               <select id="winEnergy"><option value="low">Low energy</option><option value="medium">Medium</option><option value="high">Focused</option></select>
               <select id="winTime"><option value="5">5 min</option><option value="15">15 min</option><option value="30">30 min</option><option value="60">1 hour</option></select>
@@ -1282,6 +1371,8 @@ function populateSelects() {
 
   goalChoices.querySelector('input[value="career"]').checked = true;
   winGoalChoices.querySelector('input[value="routines"]').checked = true;
+  winGoalChoices.addEventListener("change", updateWinGoalSummary);
+  updateWinGoalSummary();
 }
 
 function renderDashboard() {
@@ -1579,6 +1670,15 @@ function selectedWinGoals() {
   return selected.length ? selected : ["routines"];
 }
 
+function updateWinGoalSummary() {
+  const checked = [...document.querySelectorAll('input[name="winGoals"]:checked')];
+  const summary = document.querySelector("#winGoalSummary");
+  if (!summary) return;
+  if (!checked.length) summary.textContent = "Choose goals…";
+  else if (checked.length === 1) summary.textContent = goalName(checked[0].value);
+  else summary.textContent = `${checked.length} goals selected`;
+}
+
 function resetTaskGoalChoices() {
   document.querySelectorAll('input[name="taskGoals"]').forEach((input) => {
     input.checked = input.value === "career";
@@ -1589,6 +1689,9 @@ function resetWinGoalChoices() {
   document.querySelectorAll('input[name="winGoals"]').forEach((input) => {
     input.checked = input.value === "routines";
   });
+  updateWinGoalSummary();
+  const dropdown = document.querySelector("#winGoalDropdown");
+  if (dropdown) dropdown.open = false;
 }
 
 function setupCollapsibleSections() {
@@ -1942,11 +2045,14 @@ function bindEvents() {
   document.querySelector("#exportBackup").addEventListener("click", exportBackup);
   document.querySelector("#importBackup").addEventListener("click", importBackup);
 
-  document.querySelector("#clearToday").addEventListener("click", () => {
+  const resetToday = () => {
     model.today = [];
     saveModel();
     renderAll();
-  });
+  };
+
+  document.querySelector("#clearToday").addEventListener("click", resetToday);
+  document.querySelector("#resetTodayTouched").addEventListener("click", resetToday);
 
   document.querySelector("#spinButton").addEventListener("click", () => {
     const matches = matchingTasks();
